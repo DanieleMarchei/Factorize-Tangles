@@ -14,5 +14,4 @@ for n in range(n_factors):
         factors.append(f"T {r}")
 
 s = ",".join(factors)
-search = f"srew in REW-RULES : {s} using ((ruleRemove !) ? (ruleMove) : (fail)) * ."
 print(s)

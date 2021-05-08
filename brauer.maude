@@ -81,21 +81,14 @@ mod REW-RULES is
     crl [ruleMove] : T i , T j , F' , T i => T j  , T i , F' , T j if abs(i - j) == 1 /\ not-interfers(F', i) /\ not-interfers(F', j) .
     crl [ruleMove] : T i , F , T j , F' , T i => T j , F , T i , F' , T j if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F, j) /\ not-interfers(F', i) /\ not-interfers(F', j) .
 
-
-
     crl [ruleMove] : T i , U j , T i => T j , U i , T j if abs(i - j) == 1 .
     crl [ruleMove] : T i , F , U j , T i => T j , F , U i , T j if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F, j)  .
     crl [ruleMove] : T i , U j , F' , T i => T j , U i , F' , T j if abs(i - j) == 1 /\ not-interfers(F', i) /\ not-interfers(F', j) .
     crl [ruleMove] : T i , F , U j , F' , T i => T j , F , U i , F' , T j if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F, j) /\ not-interfers(F', i) /\ not-interfers(F', j) .
 
-
-
-    crl [ruleMove] : T i , T i' , U i , U i'' => T i'' , T i' , U i , U i'' if i' == i + 1 /\ i'' == i + 1 .
+    crl [ruleMove] : T i , T i' , U i , U i'' => T i'' , T i' , U i , U i'' if i' == i + 1 /\ i'' == i + 2 .
 
     crl [ruleMove] : P , P' => P' , P if abs(idx(P) - idx(P')) > 1 .
-
-    --- crl [ruleMove] : P , F , P' => P' , F , P if abs(idx(P) - idx(P')) > 1 /\ not-interfers(F, idx(P)) /\ not-interfers(F, idx(P')) .
-
 
 ---------------------------------------------
 
@@ -144,7 +137,3 @@ mod REW-RULES is
     
     
 endm
-
---- search in REW-RULES : T 3 , U 2 , U 4 , U 5 , U 3 , T 1 , U 5 , U 3 , T 2 , U 4 =>* F:FactorList such that length(F) < 10 .
---- search in REW-RULES : U 4,T 1,T 2,U 3,T 1 =>* F:FactorList such that length(F) < 5 .
---- U 1,U 4,U 3,T 3,T 4,T 2,T 3,U 4,U 1,T 2
