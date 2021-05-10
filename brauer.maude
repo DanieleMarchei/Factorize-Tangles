@@ -37,12 +37,18 @@ fmod FACTOR-LIST is
 
     op length : FactorList -> Nat [memo] .
 
+    op max_idx : FactorList -> Nat [memo] .
+
     var P : Factor .
     var F : FactorList .
 
     eq length(I) = 0 .
     eq length(P) = 1 .
     eq length(F , P) = 1 + length(F) .
+
+    eq max_idx(P) = idx(P) .
+    ceq max_idx(F , P) = idx(P) if max_idx(F) < idx(P) .
+    eq max_idx(F , P) = max_idx(F) [owise] .
 
 endfm
 
@@ -52,88 +58,85 @@ mod REW-RULES is
     protecting INT .
     protecting BOOL .
 
-    op min_idx : NeFactorList -> Nat [memo] .
-    op max_idx : NeFactorList -> Nat [memo] .
     op not-interfers : NeFactorList NzNat -> Bool [memo] .
 
     var i j i' i'' : NzNat .
-    var F F' : FactorList .
+    var F F' F'' : FactorList .
     var Nef Nef' : NeFactorList .
     var P P' : Factor .
 
     eq not-interfers(P, i) = abs(idx(P) - i) > 1 .
     eq not-interfers((Nef , P) , i) = not-interfers(P , i) and not-interfers(Nef , i) .
 
-    eq min_idx(P) = idx(P) .
-    ceq min_idx(Nef , P) = idx(P) if min_idx(Nef) > idx(P) .
-    eq min_idx(Nef , P) = min_idx(Nef) [owise] .
 
-    eq max_idx(P) = idx(P) .
-    ceq max_idx(Nef , P) = idx(P) if max_idx(Nef) < idx(P) .
-    eq max_idx(Nef , P) = max_idx(Nef) [owise] .
 
 
 ---------------------------------------------
 
 
-    crl [ruleMove] : T i , T j , T i => T j , T i , T j if abs(i - j) == 1 .
-    crl [ruleMove] : T i , F , T j , T i => T j , F , T i , T j if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F, j) .
-    crl [ruleMove] : T i , T j , F' , T i => T j  , T i , F' , T j if abs(i - j) == 1 /\ not-interfers(F', i) /\ not-interfers(F', j) .
-    crl [ruleMove] : T i , F , T j , F' , T i => T j , F , T i , F' , T j if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F, j) /\ not-interfers(F', i) /\ not-interfers(F', j) .
+    crl [move] : T i , T j , T i => T j , T i , T j if abs(i - j) == 1 .
+    crl [move] : T i , F , T j , T i => T j , F , T i , T j if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F, j) .
+    crl [move] : T i , T j , F' , T i => T j  , T i , F' , T j if abs(i - j) == 1 /\ not-interfers(F', i) /\ not-interfers(F', j) .
+    crl [move] : T i , F , T j , F' , T i => T j , F , T i , F' , T j if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F, j) /\ not-interfers(F', i) /\ not-interfers(F', j) .
 
-    crl [ruleMove] : T i , U j , T i => T j , U i , T j if abs(i - j) == 1 .
-    crl [ruleMove] : T i , F , U j , T i => T j , F , U i , T j if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F, j)  .
-    crl [ruleMove] : T i , U j , F' , T i => T j , U i , F' , T j if abs(i - j) == 1 /\ not-interfers(F', i) /\ not-interfers(F', j) .
-    crl [ruleMove] : T i , F , U j , F' , T i => T j , F , U i , F' , T j if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F, j) /\ not-interfers(F', i) /\ not-interfers(F', j) .
+    crl [move] : T i , F , T j , T i => F, T j , T i , T j if abs(i - j) == 1 /\ not-interfers(F, i) .
+    crl [move] : T i , T j , F' , T i => T j  , T i , T j , F' if abs(i - j) == 1 /\ not-interfers(F', i) .
+    crl [move] : T i , F , T j , F' , T i => F , T j , T i , T j , F' if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F', i) .
 
-    crl [ruleMove] : T i , T i' , U i , U i'' => T i'' , T i' , U i , U i'' if i' == i + 1 /\ i'' == i + 2 .
+    crl [move] : T i , U j , T i => T j , U i , T j if abs(i - j) == 1 .
+    crl [move] : T i , F , U j , T i => T j , F , U i , T j if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F, j)  .
+    crl [move] : T i , U j , F' , T i => T j , U i , F' , T j if abs(i - j) == 1 /\ not-interfers(F', i) /\ not-interfers(F', j) .
+    crl [move] : T i , F , U j , F' , T i => T j , F , U i , F' , T j if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F, j) /\ not-interfers(F', i) /\ not-interfers(F', j) .
 
-    crl [ruleMove] : P , P' => P' , P if abs(idx(P) - idx(P')) > 1 .
+    crl [move] : T i , F , U j , T i => F , T j , U i , T j if abs(i - j) == 1 /\ not-interfers(F, i) .
+    crl [move] : T i , U j , F' , T i => T j , U i , T j , F' if abs(i - j) == 1 /\ not-interfers(F', i) .
+    crl [move] : T i , F , U j , F' , T i => F , T j , U i , T j , F' if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F', i) .
+
+    crl [move] : P , P' => P' , P if abs(idx(P) - idx(P')) > 1 .
 
 ---------------------------------------------
 
-
-    rl  [ruleRemove] : T i , T i => I .
-    crl  [ruleRemove] : T i , F , T i => F if not-interfers(F, i) .
+    rl  [delete] : T i , T i => I .
+    crl  [delete] : T i , F , T i => F if not-interfers(F, i) .
     
-    rl  [ruleRemove] : U i , U i => U i .
-    crl  [ruleRemove] : U i , F , U i => F , U i if not-interfers(F, i) .
+    rl  [delete] : U i , U i => U i .
+    crl  [delete] : U i , F , U i => F , U i if not-interfers(F, i) .
     
-    rl  [ruleRemove] : U i , T i => U i .
-    crl  [ruleRemove] : U i , F , T i => U i , F if not-interfers(F, i) .
+    rl  [delete] : U i , T i => U i .
+    crl  [delete] : U i , F , T i => U i , F if not-interfers(F, i) .
 
-    rl  [ruleRemove] : T i , U i => U i .
-    crl  [ruleRemove] : T i , F , U i => F , U i if not-interfers(F, i) .
+    rl  [delete] : T i , U i => U i .
+    crl  [delete] : T i , F , U i => F , U i if not-interfers(F, i) .
     
-    crl [ruleRemove] : U i , U j , U i => U i if abs(i - j) == 1 .
-    crl [ruleRemove] : U i , F , U j , U i => U i , F if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F, j) .
-    crl [ruleRemove] : U i , U j , F' , U i => U i , F' if abs(i - j) == 1 /\ not-interfers(F', i) /\ not-interfers(F', j) .
-    crl [ruleRemove] : U i , F , U j , F' , U i => U i , F , F' if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F', i) /\ not-interfers(F, j) /\ not-interfers(F', j) .
+    crl [delete] : U i , U j , U i => U i if abs(i - j) == 1 .
+    crl [delete] : U i , F , U j , U i => U i , F if abs(i - j) == 1 /\ not-interfers(F, i) .
+    crl [delete] : U i , U j , F' , U i => U i , F' if abs(i - j) == 1 /\ not-interfers(F', i)  .
+    crl [delete] : U i , F , U j , F' , U i => U i , F , F' if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F', i)  .
     
-    crl [ruleRemove] : T i , U j , U i => T j , U i if abs(i - j) == 1 .
-    crl [ruleRemove] : T i , F , U j , U i => T j , U i , F if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F, j) .
-    crl [ruleRemove] : T i , U j , F' , U i => T j , U i , F' if abs(i - j) == 1 /\ not-interfers(F', i) /\ not-interfers(F', j) .
-    crl [ruleRemove] : T i , F , U j , F' , U i => T j , U i , F , F' if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F', i) /\ not-interfers(F, j) /\ not-interfers(F', j) .
+    crl [delete] : T i , U j , U i => T j , U i if abs(i - j) == 1 .
+    crl [delete] : T i , F , U j , U i => T j , U i , F if abs(i - j) == 1 /\ not-interfers(F, i) .
+    crl [delete] : T i , U j , F' , U i => T j , U i , F' if abs(i - j) == 1 /\ not-interfers(F', i)  .
+    crl [delete] : T i , F , U j , F' , U i => T j , U i , F , F' if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F', i)  .
 
-    crl [ruleRemove] : U i , U j , T i => U i , T j if abs(i - j) == 1 .
-    crl [ruleRemove] : U i , F , U j , T i => U i , T j , F if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F, j) .
-    crl [ruleRemove] : U i , U j , F' , T i => U i , T j , F' if abs(i - j) == 1 /\ not-interfers(F', i) /\ not-interfers(F', j) .
-    crl [ruleRemove] : U i , F , U j , F' , T i => U i , T j , F , F' if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F', i) /\ not-interfers(F, j) /\ not-interfers(F', j) .
+    crl [delete] : U i , U j , T i => U i , T j if abs(i - j) == 1 .
+    crl [delete] : U i , F , U j , T i => U i , T j , F if abs(i - j) == 1 /\ not-interfers(F, i) .
+    crl [delete] : U i , U j , F' , T i => U i , T j , F' if abs(i - j) == 1 /\ not-interfers(F', i)  .
+    crl [delete] : U i , F , U j , F' , T i => U i , T j , F , F' if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F', i)  .
 
-    crl [ruleRemove] : U i , T j , U i => U i if abs(i - j) == 1 .
-    crl [ruleRemove] : U i , F , T j , U i => U i , F if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F, j) .
-    crl [ruleRemove] : U i , T j , F' , U i => U i , F' if abs(i - j) == 1 /\ not-interfers(F', i) /\ not-interfers(F', j) .
-    crl [ruleRemove] : U i , F , T j , F' , U i => U i , F , F' if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F', i) /\ not-interfers(F, j) /\ not-interfers(F', j) .
+    crl [delete] : U i , T j , U i => U i if abs(i - j) == 1 .
+    crl [delete] : U i , F , T j , U i => U i , F if abs(i - j) == 1 /\ not-interfers(F, i) .
+    crl [delete] : U i , T j , F' , U i => U i , F' if abs(i - j) == 1 /\ not-interfers(F', i)  .
+    crl [delete] : U i , F , T j , F' , U i => U i , F , F' if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F', i)  .
 
-    crl [ruleRemove] : U i , T j , T i => U i , U j if abs(i - j) == 1 .
-    crl [ruleRemove] : U i , F , T j , T i => U i , U j , F if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F, j) .
-    crl [ruleRemove] : U i , T j , F' , T i => U i , U j , F' if abs(i - j) == 1 /\ not-interfers(F', i) /\ not-interfers(F', j) .
-    crl [ruleRemove] : U i , F , T j , F' , T i => U i , U j , F , F' if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F', i) /\ not-interfers(F, j) /\ not-interfers(F', j) .
+    crl [delete] : U i , T j , T i => U i , U j if abs(i - j) == 1 .
+    crl [delete] : U i , F , T j , T i => U i , U j , F if abs(i - j) == 1 /\ not-interfers(F, i) .
+    crl [delete] : U i , T j , F' , T i => U i , U j , F' if abs(i - j) == 1 /\ not-interfers(F', i)  .
+    crl [delete] : U i , F , T j , F' , T i => U i , U j , F , F' if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F', i)  .
 
-    crl [ruleRemove] : T i , T j , U i => U j , U i if abs(i - j) == 1 .
-    crl [ruleRemove] : T i , F , T j , U i => U j , U i , F if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F, j) .
-    crl [ruleRemove] : T i , T j , F' , U i => U j , U i , F' if abs(i - j) == 1 /\ not-interfers(F', i) /\ not-interfers(F', j) .
-    crl [ruleRemove] : T i , F , T j , F' , U i => U j , U i , F , F' if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F', i) /\ not-interfers(F, j) /\ not-interfers(F', j) .
+    crl [delete] : T i , T j , U i => U j , U i if abs(i - j) == 1 .
+    crl [delete] : T i , F , T j , U i => U j , U i , F if abs(i - j) == 1 /\ not-interfers(F, i) .
+    crl [delete] : T i , T j , F' , U i => U j , U i , F' if abs(i - j) == 1 /\ not-interfers(F', i)  .
+    crl [delete] : T i , F , T j , F' , U i => U j , U i , F , F' if abs(i - j) == 1 /\ not-interfers(F, i) /\ not-interfers(F', i)  .
     
     
 endm
