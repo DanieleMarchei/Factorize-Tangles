@@ -17,6 +17,8 @@ def rewrite(term, max_patience = np.inf, strategy_rule = "(delete ! | move)*"):
 
     brauer = maude.getModule("REW-RULES")
     t = brauer.parseTerm(term)
+
+    # calculate the max number of factors the term can have
     N = brauer.parseTerm(f"max_idx({term})")
     N.reduce()
     N = N.toInt() + 1
@@ -24,26 +26,31 @@ def rewrite(term, max_patience = np.inf, strategy_rule = "(delete ! | move)*"):
 
     strategy = brauer.parseStrategy(strategy_rule)
     
-
     min_factorization = (np.inf, None)
 
+    # perform srew with depth first search
     results = t.srewrite(strategy, True)
     current_patience = max_patience
     out_of_patience = False
     for res in results:
+        # calculate result length
         l = brauer.parseTerm(f"length({res[0]})")
         l.reduce()
         l = l.toInt()
 
         if l < min_factorization[0]:
+            # save current best and restore current patience
             min_factorization = (l, res[0])
             current_patience = max_patience
         elif l > min_factorization[0]:
+            # stop looping because we have reached the bottom of the tree
             break
         elif l <= factors_upper_bound:
+            # do not start to lose patience until we have reached the upper bound
             current_patience -= 1
         
         if current_patience <= 0 and max_patience > 0:
+            # stop looping if patience was lost
             out_of_patience = True
             break
 

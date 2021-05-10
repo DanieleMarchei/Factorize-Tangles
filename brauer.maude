@@ -69,8 +69,6 @@ mod REW-RULES is
     eq not-interfers((Nef , P) , i) = not-interfers(P , i) and not-interfers(Nef , i) .
 
 
-
-
 ---------------------------------------------
 
 
