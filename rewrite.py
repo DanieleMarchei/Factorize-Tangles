@@ -8,15 +8,30 @@ def init():
     maude.init()
     maude.load('brauer.maude')
 
-def rewrite(term, max_patience = np.inf, strategy_rule = "(delete ! | move)*"):
+def rewrite(term, max_patience = np.inf, strategy_rule = "simple"):
     ''' Rewrites the input term as an equivalent and (possibly) smaller factorization.
     Arguments:
         term : the Maude term to be rewritten
-        max_patience : integer (default: np.inf), how many steps inside a local minima are you willing to perform
+        max_patience : integer, str (default: np.inf), how many steps inside a local minima are you willing to perform. If "auto" is equal to 1000 * length of term
+        strategy_rule : str (default: "simple") the strategy rule to use during srew.
     '''
+
+    simple = "(delete ! | move)*"
+    advanced = "((delete | deleteAdvanced) ! | (move | moveAdvanced | swap))*"
+
+    if strategy_rule == "simple":
+        strategy_rule = simple
+    elif strategy_rule == "advanced":
+        strategy_rule = advanced
 
     brauer = maude.getModule("REW-RULES")
     t = brauer.parseTerm(term)
+    t_len = brauer.parseTerm(f"length({term})")
+    t_len.reduce()
+    t_len = t_len.toInt()
+
+    if max_patience == "auto":
+        max_patience = 1000 * t_len
 
     # calculate the max number of factors the term can have
     N = brauer.parseTerm(f"max_idx({term})")

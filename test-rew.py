@@ -3,7 +3,7 @@ import rewrite as rew
 from random import randint
 
 rew.init()
-n_factors = 7
+n_factors = 4
 max_upper_bound = 5
 
 for i in range(1000):
