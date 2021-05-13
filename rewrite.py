@@ -8,7 +8,7 @@ def init():
     maude.init()
     maude.load('brauer.maude')
 
-def rewrite(term, max_patience = np.inf, strategy_rule = "simple"):
+def rewrite(term, max_patience = np.inf):
     ''' Rewrites the input term as an equivalent and (possibly) smaller factorization.
     Arguments:
         term : the Maude term to be rewritten
@@ -16,13 +16,9 @@ def rewrite(term, max_patience = np.inf, strategy_rule = "simple"):
         strategy_rule : str (default: "simple") the strategy rule to use during srew.
     '''
 
-    simple = "(delete ! | move)*"
-    advanced = "((delete | deleteAdvanced) ! | (move | moveAdvanced | swap))*"
+    assert(max_patience >= 0)
 
-    if strategy_rule == "simple":
-        strategy_rule = simple
-    elif strategy_rule == "advanced":
-        strategy_rule = advanced
+    strategy_rule = "(delete ! | move)*"
 
     brauer = maude.getModule("REW-RULES")
     t = brauer.parseTerm(term)
@@ -64,7 +60,7 @@ def rewrite(term, max_patience = np.inf, strategy_rule = "simple"):
             # do not start to lose patience until we have reached the upper bound
             current_patience -= 1
         
-        if current_patience <= 0 and max_patience > 0:
+        if current_patience <= 0:
             # stop looping if patience was lost
             out_of_patience = True
             break
