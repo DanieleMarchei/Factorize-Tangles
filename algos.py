@@ -1,6 +1,7 @@
 import numpy as np
 import networkx as nx
-       
+import random
+
 
 def inv_to_graph(inv):
     g = nx.Graph()
@@ -163,10 +164,15 @@ def is_transversal(edge):
 
 def is_positive_transversal(edge):
     e1, e2 = edge_to_int(edge)
-    return is_transversal(edge) and e1 >= e2
+    return is_transversal(edge) and e1 > e2
 
 def is_negative_transversal(edge):
-    return not is_positive_transversal(edge)
+    e1, e2 = edge_to_int(edge)
+    return is_transversal(edge) and e1 < e2
+
+def is_zero_transversal(edge):
+    e1, e2 = edge_to_int(edge)
+    return is_transversal(edge) and e1 == e2
 
 def edge_to_int(edge):
     return [int(edge[0].replace("'","")), int(edge[1].replace("'",""))]
@@ -187,51 +193,11 @@ def is_partial_cover(edge, h):
         return False
     e1, e2 = edge_to_int(edge)
     h1, h2 = edge_to_int(h)
-    if is_hook(edge):
-        return (e1 == h1 and e2 >= h2) or (e1 <= h1 and e2 == h2)
-    else:
-        return (e1 == h1 and e2 > h2) or (e1 == h2 and e2 < h1)
-
-def are_intersecting_edges(edge1, edge2):
-    e1_1, e1_2 = edge_to_int(edge1)
-    e2_1, e2_2 = edge_to_int(edge2)
-    if e1_1 > e2_1:
-        return are_intersecting_edges(edge2, edge1)
-    
-    if is_transversal(edge1) and is_transversal(edge2):
-        return e1_1 < e2_1 and e2_2 < e1_2
-    if is_hook(edge1) and is_hook(edge2):
-        return e1_1 < e2_1 < e1_2
-    if is_upper_hook(edge1) and is_transversal(edge2):
-        return e1_1 < e2_1 < e1_2
-    if is_lower_hook(edge1) and is_transversal(edge2):
-        return e1_1 < e2_2 < e1_2
-    if is_transversal(edge1) and is_lower_hook(edge2):
-        return e2_1 < e1_2 < e2_2
-    if is_transversal(edge1) and is_upper_hook(edge2):
-        return e2_1 < e1_1 < e2_2
-
-    print(edge1, edge2)
-    raise Exception("Error in edge type")
-
-def n_intersecting_edges(inv, edge):
-    n = 0
-    for e in inv:
-        if e == edge:
-            continue
-        if are_intersecting_edges(edge, e):
-            n += 1
-    return n
-
-def edge_penality(inv, edge):
-    penality = 0
-    for e in inv:
-        if e == edge:
-            continue
-        if is_hook(e):
-            if are_intersecting_edges(edge, e):
-                penality += 1
-    return penality
+    # if is_hook(edge):
+    #     return (e1 == h1 and e2 >= h2) or (e1 <= h1 and e2 == h2)
+    # else:
+    #     return (e1 == h1 and e2 > h2) or (e1 == h2 and e2 < h1)
+    return e1 == h1 or e1 == h2 or e2 == h1 or e2 == h2
 
 def find_candidate(inv, h):
     #search for lower hooks that fully cover h
@@ -280,12 +246,6 @@ def merge_with_candidate(inv, h):
     edge = find_candidate(inv, h)
     return merge_lower_hook_with_edge(inv, h, edge)
 
-def merge_lower_hook_with_all_edges(inv, h):
-    for edge in inv:
-        if edge == h:
-            continue
-        yield merge_lower_hook_with_edge(inv, h, edge)
-
 def merge_edge_with_hook(edge, h):
     result = []
     if is_hook(edge):
@@ -302,3 +262,207 @@ def merge_edge_with_hook(edge, h):
 
 def is_cover(edge, h):
   return is_full_cover(edge,h) or is_partial_cover(edge, h)
+
+def is_I(inv):
+    for e in inv:
+        e1,e2 = edge_to_int(e)
+        if e1 != e2:
+            return False
+    return True
+
+def is_T_tangle(inv):
+    for e in inv:
+        if not is_transversal(e):
+            return False
+    return True
+
+def is_U_tangle(inv):
+    for e in inv:
+        if is_lower_hook(e) and size(e) == 1:
+            return True
+    return False
+
+def is_H_tangle(inv):
+    return not is_T_tangle(inv) and not is_U_tangle(inv)
+
+def bottom_enumeration(inv):
+    b = []
+    for e in inv:
+        _,e2 = edge_to_int(e)
+        b.append(e2)
+    
+    return b
+
+def find_swaps(b):
+    factor_list = []
+    for j in range(len(b)):
+        for i in range(len(b) - 1 - j):
+            if b[i] > b[i + 1]:
+                b[i], b[i + 1] = b[i + 1], b[i]
+                factor_list.append(f"T{i+1}")
+    return factor_list
+
+def factorizeT(inv):
+    if is_I(inv):
+        return []
+
+    b = bottom_enumeration(inv)
+    swaps = find_swaps(b)
+    return swaps
+
+def get_lower_hook_size_one(inv):
+    for h in inv:
+        if is_lower_hook(h) and size(h) == 1:
+            return h
+
+def get_smallest_lower_hook(inv):
+    res = (None, np.inf)
+    for h in inv:
+        if is_lower_hook(h) and size(h) > 1:
+            if size(h) < res[1]:
+                res = (h, size(h))
+    return res[0]
+
+def get_covers(h, inv):
+    covers = []
+    for e in inv:
+        if is_cover(e,h):
+            covers.append(e)
+    
+    return covers
+
+def factorizeU(inv):
+    h = get_lower_hook_size_one(inv)
+    i,_ = edge_to_int(h)
+    C = get_covers(h, inv)
+    print(C)
+
+    # single partial cover
+    single_cover = None
+    for cover in C:
+        if is_partial_cover(cover,h):
+            if single_cover == None:
+                single_cover = cover
+            else:
+                single_cover = None
+                break
+    
+    if single_cover != None:
+        return merge_lower_hook_with_edge(inv, single_cover, h), f"U{i}"
+    
+    # single full cover
+    single_cover = None
+    for cover in C:
+        if is_full_cover(cover,h):
+            if single_cover == None:
+                single_cover = cover
+            else:
+                single_cover = None
+                break
+    
+    if single_cover != None:
+        return merge_lower_hook_with_edge(inv, single_cover, h), f"U{i}"
+    
+    # full cover lower hooks
+    for cover in C:
+        if is_lower_hook(cover):
+            return merge_lower_hook_with_edge(inv, cover, h), f"U{i}"
+    
+    # pick one full cover at random
+    full_covers = []
+    for cover in C:
+        if is_full_cover(cover,h):
+            full_covers.append(cover)
+
+    cover = random.choice(full_covers)
+    return merge_lower_hook_with_edge(inv, cover, h), f"U{i}"
+
+def interior_edges(inv, h):
+    h1,h2 = edge_to_int(h)
+    non_zero_int = []
+    zero_int = []
+    for edge in inv:
+        if edge == h:
+            continue
+
+        if "'" not in edge[0] and "'" not in edge[1]:
+            continue
+
+        e1,e2 = edge_to_int(edge)
+        if is_transversal(edge):
+            if h1 < e2 < h2:
+                if is_zero_transversal(edge):
+                    zero_int.append(edge)
+                else:
+                    non_zero_int.append(edge)
+        else:
+            if e1 < h1 < e2 or  h1 < e2 < h2:
+                non_zero_int.append(edge)
+    
+    return non_zero_int, zero_int
+        
+
+# def val(edge, h):
+#     e1,e2 = edge_to_int(edge)
+#     h1,h2 = edge_to_int(h)
+#     if is_positive_transversal(edge) or is_lower_hook(edge) and e2 > h2:
+#         return 1
+    
+#     if is_negative_transversal(edge) or is_lower_hook(edge) and e1 < h1:
+#         return -1
+    
+#     if is_zero_transversal(edge):
+#         return 0
+    
+#     raise Exception("Invalid edges")
+
+
+
+def factorizeH(inv):
+    h = get_smallest_lower_hook(inv)
+    h1,h2 = edge_to_int(h)
+    non_zero_int, zero_int = interior_edges(inv, h)
+
+    interior = non_zero_int + zero_int
+    val_lookup = {}
+    for edge in interior:
+        e1,e2 = edge_to_int(edge)
+        if is_positive_transversal(edge):
+            val_lookup[e2 - h1] = +1
+        elif is_lower_hook(edge) and e2 > h2:
+            val_lookup[e1 - h1] = +1
+        elif is_negative_transversal(edge):
+            val_lookup[e2 - h1] = -1
+        elif is_lower_hook(edge) and e1 < h1:
+            val_lookup[e2 - h1] = -1
+
+    locations = [0]*size(h)
+    for edge in non_zero_int:
+        e1,e2 = edge_to_int(edge)
+        if is_lower_hook(edge) and e2 > h2:
+            locations[0] += val_lookup[e1 - h1]
+        else:
+            locations[0] += val_lookup[e2 - h1]
+
+    locations[0] *= -1
+    locations[0] += len(zero_int)
+
+    best_location = (None, np.inf)
+    for i in range(1,len(locations)):
+        locations[i] = locations[i-1] + 2*val_lookup[i]
+        if locations[i] < best_location[1]:
+            best_location = (i+1, locations[i])
+    
+    j = best_location[0]
+    L = []
+    for i in range(h1,h1+j-1):
+        L.append(f"T{i}")
+    
+    R = []
+    for i in range(size(h)+h1-1,j+1,-1):
+        R.append(f"T{i}")
+    
+    g = inv_to_graph(inv)
+    LR = L + R
+    result = compose(LR, len(inv), g)
+    return result, L[::-1] + R[::-1]
