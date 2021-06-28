@@ -193,36 +193,11 @@ def is_partial_cover(edge, h):
         return False
     e1, e2 = edge_to_int(edge)
     h1, h2 = edge_to_int(h)
-    # if is_hook(edge):
-    #     return (e1 == h1 and e2 >= h2) or (e1 <= h1 and e2 == h2)
-    # else:
-    #     return (e1 == h1 and e2 > h2) or (e1 == h2 and e2 < h1)
-    return e1 == h1 or e1 == h2 or e2 == h1 or e2 == h2
+    if is_hook(edge):
+        return (e1 == h1 and e2 >= h2) or (e1 <= h1 and e2 == h2)
+    else:
+        return (e1 == h1 and e2 > h2) or (e1 == h2 and e2 < h1)
 
-def find_candidate(inv, h):
-    #search for lower hooks that fully cover h
-    for edge in inv:
-        if is_lower_hook(edge) and is_full_cover(edge, h):
-            return edge
-    
-    # if there is no lower hook, than take the fully covering edge with fewer intersecting edges
-    few_penality_full_cover = (None, 999999)
-    for edge in inv:
-        if is_full_cover(edge, h):
-            penality = edge_penality(inv, edge)
-            if penality < few_penality_full_cover[1]:
-                few_penality_full_cover = (edge, penality)
-    
-    if few_penality_full_cover[0] != None:
-        return few_penality_full_cover[0]
-    
-    # if there is no biggest fully covering edge, take the partially covering one
-    for edge in inv:
-        if is_partial_cover(edge, h):
-            return edge
-    
-    #this state should not be reachable
-    raise Exception("Candidate not found")
 
 def merge_lower_hook_with_edge(inv : list, h, edge):
     result = inv[:]
@@ -241,10 +216,6 @@ def merge_lower_hook_with_edge(inv : list, h, edge):
 
     G = inv_to_graph(result)
     return get_inv(G, len(result))[0]
-
-def merge_with_candidate(inv, h):
-    edge = find_candidate(inv, h)
-    return merge_lower_hook_with_edge(inv, h, edge)
 
 def merge_edge_with_hook(edge, h):
     result = []
@@ -344,7 +315,7 @@ def factorizeU(inv):
                 break
     
     if single_cover != None:
-        return merge_lower_hook_with_edge(inv, single_cover, h), [f"U{i}"]
+        return merge_lower_hook_with_edge(inv, h, single_cover), [f"U{i}"]
     
     # single full cover
     single_cover = None
@@ -357,12 +328,12 @@ def factorizeU(inv):
                 break
     
     if single_cover != None:
-        return merge_lower_hook_with_edge(inv, single_cover, h), [f"U{i}"]
+        return merge_lower_hook_with_edge(inv, h, single_cover), [f"U{i}"]
     
     # full cover lower hooks
     for cover in C:
         if is_lower_hook(cover):
-            return merge_lower_hook_with_edge(inv, cover, h), [f"U{i}"]
+            return merge_lower_hook_with_edge(inv, h, cover), [f"U{i}"]
     
     # pick one full cover at random
     full_covers = []
@@ -371,7 +342,7 @@ def factorizeU(inv):
             full_covers.append(cover)
 
     cover = random.choice(full_covers)
-    return merge_lower_hook_with_edge(inv, cover, h), [f"U{i}"]
+    return merge_lower_hook_with_edge(inv, h, cover), [f"U{i}"]
 
 def interior_edges(inv, h):
     h1,h2 = edge_to_int(h)
@@ -381,7 +352,7 @@ def interior_edges(inv, h):
         if edge == h:
             continue
 
-        if "'" not in edge[0] and "'" not in edge[1]:
+        if is_upper_hook(edge):
             continue
 
         e1,e2 = edge_to_int(edge)
@@ -392,26 +363,10 @@ def interior_edges(inv, h):
                 else:
                     non_zero_int.append(edge)
         else:
-            if e1 < h1 < e2 or  h1 < e2 < h2:
+            if e1 < h1 < e2 or h1 < e1 < h2:
                 non_zero_int.append(edge)
     
     return non_zero_int, zero_int
-        
-
-# def val(edge, h):
-#     e1,e2 = edge_to_int(edge)
-#     h1,h2 = edge_to_int(h)
-#     if is_positive_transversal(edge) or is_lower_hook(edge) and e2 > h2:
-#         return 1
-    
-#     if is_negative_transversal(edge) or is_lower_hook(edge) and e1 < h1:
-#         return -1
-    
-#     if is_zero_transversal(edge):
-#         return 0
-    
-#     raise Exception("Invalid edges")
-
 
 
 def factorizeH(inv):
@@ -431,6 +386,8 @@ def factorizeH(inv):
             val_lookup[e2 - h1] = -1
         elif is_lower_hook(edge) and e1 < h1:
             val_lookup[e2 - h1] = -1
+        else:
+            val_lookup[e2 - h1] = 0
 
     locations = [0]*size(h)
     for edge in non_zero_int:
@@ -443,7 +400,7 @@ def factorizeH(inv):
     locations[0] *= -1
     locations[0] += len(zero_int)
 
-    best_location = (None, np.inf)
+    best_location = (0, locations[0])
     for i in range(1,len(locations)):
         locations[i] = locations[i-1] + 2*val_lookup[i]
         if locations[i] < best_location[1]:
@@ -455,7 +412,7 @@ def factorizeH(inv):
         L.append(f"T{i}")
     
     R = []
-    for i in range(size(h)+h1-1,j+1,-1):
+    for i in range(size(h)+h1-1,j+h1-1,-1):
         R.append(f"T{i}")
     
     g = inv_to_graph(inv)
@@ -464,8 +421,10 @@ def factorizeH(inv):
     return result, L[::-1] + R[::-1]
 
 def factorize(inv):
+    print(inv_to_text(inv))
+
     if is_I(inv):
-        return []
+        return ["I"]
     
     if is_T_tangle(inv):
         return factorizeT(inv)
@@ -476,5 +435,24 @@ def factorize(inv):
     
     if is_H_tangle(inv):
         new_inv, ts = factorizeH(inv)
+        print(inv_to_text(new_inv))
         new_inv, u = factorizeU(new_inv)
         return factorize(new_inv) + u + ts
+
+def text_to_inv(text):
+    inv = []
+    pairs = text.split(",")
+    for pair in pairs:
+        a,b = pair.split(":")
+        inv.append([a,b])
+    
+    return inv
+
+def inv_to_text(inv):
+    s = ""
+    for i, (a,b) in enumerate(inv):
+            end = ","
+            if i == len(inv) - 1:
+                end = ""
+            s += f"{a}:{b}{end}"
+    return s
