@@ -303,9 +303,6 @@ def find_swaps(b):
     return factor_list
 
 def factorizeT(inv):
-    if is_I(inv):
-        return []
-
     b = bottom_enumeration(inv)
     swaps = find_swaps(b)
     return swaps
@@ -335,7 +332,6 @@ def factorizeU(inv):
     h = get_lower_hook_size_one(inv)
     i,_ = edge_to_int(h)
     C = get_covers(h, inv)
-    print(C)
 
     # single partial cover
     single_cover = None
@@ -348,7 +344,7 @@ def factorizeU(inv):
                 break
     
     if single_cover != None:
-        return merge_lower_hook_with_edge(inv, single_cover, h), f"U{i}"
+        return merge_lower_hook_with_edge(inv, single_cover, h), [f"U{i}"]
     
     # single full cover
     single_cover = None
@@ -361,12 +357,12 @@ def factorizeU(inv):
                 break
     
     if single_cover != None:
-        return merge_lower_hook_with_edge(inv, single_cover, h), f"U{i}"
+        return merge_lower_hook_with_edge(inv, single_cover, h), [f"U{i}"]
     
     # full cover lower hooks
     for cover in C:
         if is_lower_hook(cover):
-            return merge_lower_hook_with_edge(inv, cover, h), f"U{i}"
+            return merge_lower_hook_with_edge(inv, cover, h), [f"U{i}"]
     
     # pick one full cover at random
     full_covers = []
@@ -375,7 +371,7 @@ def factorizeU(inv):
             full_covers.append(cover)
 
     cover = random.choice(full_covers)
-    return merge_lower_hook_with_edge(inv, cover, h), f"U{i}"
+    return merge_lower_hook_with_edge(inv, cover, h), [f"U{i}"]
 
 def interior_edges(inv, h):
     h1,h2 = edge_to_int(h)
@@ -466,3 +462,19 @@ def factorizeH(inv):
     LR = L + R
     result = compose(LR, len(inv), g)
     return result, L[::-1] + R[::-1]
+
+def factorize(inv):
+    if is_I(inv):
+        return []
+    
+    if is_T_tangle(inv):
+        return factorizeT(inv)
+    
+    if is_U_tangle(inv):
+        new_inv, u = factorizeU(inv)
+        return factorize(new_inv) + u
+    
+    if is_H_tangle(inv):
+        new_inv, ts = factorizeH(inv)
+        new_inv, u = factorizeU(new_inv)
+        return factorize(new_inv) + u + ts

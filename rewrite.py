@@ -8,6 +8,7 @@ def init():
     maude.init()
     maude.load('brauer.maude')
 
+
 def rewrite(term, max_patience = np.inf):
     ''' Rewrites the input term as an equivalent and (possibly) smaller factorization.
     Arguments:
@@ -71,13 +72,18 @@ def rewrite(term, max_patience = np.inf):
 
     return d
 
-def rewrite2(term, max_patience = np.inf):
+def rewrite2(factor_list, max_patience = np.inf):
     ''' Rewrites the input term as an equivalent and (possibly) smaller factorization.
     Arguments:
-        term : the Maude term to be rewritten
+        factor_list : the factor list to be reduced
         max_patience : integer, str (default: np.inf), how many steps inside a local minima are you willing to perform. If "auto" is equal to 1000 * length of term
     '''
 
+    term = []
+    for factor in factor_list:
+        term.append(f"{factor[0]} {factor[1:]}")
+
+    term = ",".join(term)
     strategy_rule = "(delete ! | move)*"
 
     brauer = maude.getModule("REW-RULES")
@@ -120,4 +126,9 @@ def rewrite2(term, max_patience = np.inf):
             break
 
     # no better solution was found
-    return term
+
+    reduced_factor_list = []
+    for factor in term.split(","):
+        reduced_factor_list.append(factor.replace(" ", ""))
+
+    return reduced_factor_list

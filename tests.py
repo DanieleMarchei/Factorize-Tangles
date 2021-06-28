@@ -1,4 +1,5 @@
 from algos import *
+from rewrite import rewrite2, init
 
 def text_to_inv(text):
     #inv = 1:2,3:4,5:6
@@ -13,5 +14,8 @@ def text_to_inv(text):
 
 # x = text_to_inv("1:4',2:3,4:1',5:3',6:5',2':6'")
 x = text_to_inv("1:4',2:3',3:2',4:5,1':5'")
-factors = factorizeH(x)
+factors = factorize(x)
 print(factors)
+init()
+term = rewrite2(factors)
+print(term)
