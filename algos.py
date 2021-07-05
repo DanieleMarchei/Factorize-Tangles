@@ -143,6 +143,8 @@ def compose(factors, N, start = "I"):
         composition = I
     else:
         composition = start
+    
+
     for f in factors:
         composition, inv_composition = product(composition, primes_dict[f], N)
     
@@ -421,7 +423,7 @@ def factorizeH(inv):
     return result, L[::-1] + R[::-1]
 
 def factorize(inv):
-    print(inv_to_text(inv))
+    # print(inv_to_text(inv))
 
     if is_I(inv):
         return ["I"]
@@ -435,7 +437,7 @@ def factorize(inv):
     
     if is_H_tangle(inv):
         new_inv, ts = factorizeH(inv)
-        print(inv_to_text(new_inv))
+        # print(inv_to_text(new_inv))
         new_inv, u = factorizeU(new_inv)
         return factorize(new_inv) + u + ts
 

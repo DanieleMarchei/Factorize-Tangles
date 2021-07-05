@@ -1,4 +1,5 @@
-from algos import factorize,inv_to_text
+from numpy import tan
+from algos import factorize,inv_to_text,compose, is_I
 from rewrite import *
 from random import choice
 
@@ -24,6 +25,13 @@ N = 15
 for n in range(3,N):
     for _ in range(10*N):
         tangle = random_tangle(n)
-        print(inv_to_text(tangle))
+        if is_I(tangle):
+            continue
+
         factors = factorize(tangle)
         factors = rewrite(factors)
+        minimal_tangle = compose(factors, n)
+        if tangle != minimal_tangle:
+            print(tangle)
+            print(minimal_tangle)
+            exit(1)

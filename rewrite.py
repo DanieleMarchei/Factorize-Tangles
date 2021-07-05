@@ -1,3 +1,4 @@
+from algos import factorize
 import numpy as np
 import maude
 
@@ -16,9 +17,13 @@ def rewrite(factor_list, max_patience = "auto"):
         max_patience : integer, str (default: auto), how many steps inside a local minima are you willing to perform. If "auto" is equal to 1000 * length of term
     '''
 
+    factor_list = [factor for factor in factor_list if factor != "I"]
+
     # covert factor list to Maude term
     term = []
     for factor in factor_list:
+        if factor == "I": continue
+
         term.append(f"{factor[0]} {factor[1:]}")
 
     term = ",".join(term)
