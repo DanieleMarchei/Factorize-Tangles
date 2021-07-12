@@ -1,16 +1,17 @@
 import numpy as np
 import networkx as nx
 import random
+import maude
 
 
-def inv_to_graph(inv):
+def _inv_to_graph(inv):
     g = nx.Graph()
     g.add_edges_from(inv)
     
     return g
 
 
-def prepare(g, N):
+def _prepare(g, N):
     mapping = {}
     for n in range(N):
         mapping[str(n+1)+"'"] = str(n+1) + "''"
@@ -22,7 +23,7 @@ def prepare(g, N):
     b = nx.relabel_nodes(a, mapping)
     return b
 
-def to_tangle(g,N):
+def _to_tangle(g,N):
     inv = []
     nodes = []
     for n in range(N):
@@ -52,7 +53,7 @@ def to_tangle(g,N):
 
     return inv
 
-def get_inv(g,N):
+def _get_inv(g,N):
     inv = []
     nodes = []
     for n in range(N):
@@ -80,10 +81,10 @@ def get_inv(g,N):
 
     return inv, str(inv)
 
-def product(a,b,N):
-    _b = prepare(b,N)
+def _product(a,b,N):
+    _b = _prepare(b,N)
     c = nx.compose(a,_b)
-    inv = to_tangle(c,N)
+    inv = _to_tangle(c,N)
     nodes = [x for b in inv for x in b]
     edges = [(a[0],a[1]) for a in inv]
     res = nx.Graph()
@@ -91,7 +92,7 @@ def product(a,b,N):
     res.add_edges_from(edges)
     return res, inv
 
-def generate_primes(N):
+def _generate_primes(N):
     names = []
     for n in range(N):
         names.append(str(n+1))
@@ -136,8 +137,19 @@ def generate_primes(N):
     
     return primes_dict
 
-def compose(factors, N, start = "I"):
-    primes_dict = generate_primes(N)
+def compose(factor_list, N):
+    '''
+    Composes the factors in the input factor list to obtain the tangle they create.
+    '''
+    primes_dict = _generate_primes(N)    
+
+    for f in factor_list:
+        composition, inv_composition = _product(composition, primes_dict[f], N)
+    
+    return inv_composition
+
+def _compose(factor_list, N, start = "I"):
+    primes_dict = _generate_primes(N)
 
     if start == "I":
         composition = primes_dict["I"]
@@ -145,63 +157,93 @@ def compose(factors, N, start = "I"):
         composition = start
     
 
-    for f in factors:
-        composition, inv_composition = product(composition, primes_dict[f], N)
+    for f in factor_list:
+        composition, inv_composition = _product(composition, primes_dict[f], N)
     
     return inv_composition
 
 def is_hook(edge):
+    '''
+    Returns True if the input edge is a hook.
+    '''
     return is_lower_hook(edge) or is_upper_hook(edge)
 
 def is_lower_hook(edge):
+    '''
+    Returns True if the input edge is a lower hook.
+    '''
     e1, e2 = edge
     return "'" in e1 and "'" in e2
 
 def is_upper_hook(edge):
+    '''
+    Returns True if the input edge is a upper hook.
+    '''
     e1, e2 = edge
     return "'" not in e1 and "'" not in e2
 
 def is_transversal(edge):
+    '''
+    Returns True if the input edge is transversal.
+    '''
     return not is_hook(edge)
 
 def is_positive_transversal(edge):
-    e1, e2 = edge_to_int(edge)
+    '''
+    Returns True if the input edge is a positive transversal.
+    '''
+    e1, e2 = _edge_to_int(edge)
     return is_transversal(edge) and e1 > e2
 
 def is_negative_transversal(edge):
-    e1, e2 = edge_to_int(edge)
+    '''
+    Returns True if the input edge is a negative transversal.
+    '''
+    e1, e2 = _edge_to_int(edge)
     return is_transversal(edge) and e1 < e2
 
 def is_zero_transversal(edge):
-    e1, e2 = edge_to_int(edge)
+    '''
+    Returns True if the input edge is a zero transversal.
+    '''
+    e1, e2 = _edge_to_int(edge)
     return is_transversal(edge) and e1 == e2
 
-def edge_to_int(edge):
+def _edge_to_int(edge):
     return [int(edge[0].replace("'","")), int(edge[1].replace("'",""))]
 
 def size(edge):
-    e1, e2 = edge_to_int(edge)
+    '''
+    Returns the size of the input edge
+    '''
+    e1, e2 = _edge_to_int(edge)
     return np.abs(e1-e2)
 
 def is_full_cover(edge, h):
+    '''
+    Returns True if edge is a full cover for lower hook h.
+    '''
     if edge == h:
         return False
-    e1, e2 = edge_to_int(edge)
-    h1, h2 = edge_to_int(h)
+    e1, e2 = _edge_to_int(edge)
+    h1, h2 = _edge_to_int(h)
     return (e1 < h1 and e2 > h2) or (e1 > h2 and e2 < h1)
 
 def is_partial_cover(edge, h):
+    '''
+    Returns True if edge is a partial cover for lower hook h.
+    '''
     if edge == h:
         return False
-    e1, e2 = edge_to_int(edge)
-    h1, h2 = edge_to_int(h)
+    e1, e2 = _edge_to_int(edge)
+    h1, h2 = _edge_to_int(h)
     if is_hook(edge):
         return (e1 == h1 and e2 >= h2) or (e1 <= h1 and e2 == h2)
     else:
         return (e1 == h1 and e2 > h2) or (e1 == h2 and e2 < h1)
 
 
-def merge_lower_hook_with_edge(inv : list, h, edge):
+def _merge_lower_hook_with_edge(inv : list, h, edge):
     result = inv[:]
     result.remove(edge)
     result.remove(h)
@@ -216,57 +258,59 @@ def merge_lower_hook_with_edge(inv : list, h, edge):
             result.append([edge[0], h[0]])
             result.append([h[1], edge[1]])
 
-    G = inv_to_graph(result)
-    return get_inv(G, len(result))[0]
+    G = _inv_to_graph(result)
+    return _get_inv(G, len(result))[0]
 
-def merge_edge_with_hook(edge, h):
-    result = []
-    if is_hook(edge):
-        result.append([edge[0], h[0]])
-        result.append([edge[1], h[1]])
-    else:
-        if is_positive_transversal(edge):
-            result.append([edge[0], h[1]])
-            result.append([edge[1], h[0]])
-        else:
-            result.append([edge[0], h[0]])
-            result.append([h[1], edge[1]])
-    return result
 
 def is_cover(edge, h):
-  return is_full_cover(edge,h) or is_partial_cover(edge, h)
+    '''
+    Returns True if edge is a cover for lower hook h.
+    '''
+    return is_full_cover(edge,h) or is_partial_cover(edge, h)
 
 def is_I(inv):
+    '''
+    Returns True if the input tangle is the identity tangle and False otherwise.
+    '''
     for e in inv:
-        e1,e2 = edge_to_int(e)
+        e1,e2 = _edge_to_int(e)
         if e1 != e2:
             return False
     return True
 
 def is_T_tangle(inv):
+    '''
+    Returns True if the input tangle is a T-tangle and False otherwise.
+    '''
     for e in inv:
         if not is_transversal(e):
             return False
     return True
 
 def is_U_tangle(inv):
+    '''
+    Returns True if the input tangle is an U-tangle and False otherwise.
+    '''
     for e in inv:
         if is_lower_hook(e) and size(e) == 1:
             return True
     return False
 
 def is_H_tangle(inv):
+    '''
+    Returns True if the input tangle is a H-tangle and False otherwise.
+    '''
     return not is_T_tangle(inv) and not is_U_tangle(inv)
 
-def bottom_enumeration(inv):
+def _bottom_enumeration(inv):
     b = []
     for e in inv:
-        _,e2 = edge_to_int(e)
+        _,e2 = _edge_to_int(e)
         b.append(e2)
     
     return b
 
-def find_swaps(b,padding):
+def _find_swaps(b,padding):
     factor_list = []
     for j in range(len(b)):
         for i in range(len(b) - 1 - j):
@@ -275,17 +319,17 @@ def find_swaps(b,padding):
                 factor_list.append(f"T{i+1+padding}")
     return factor_list
 
-def factorizeT(inv,padding):
-    b = bottom_enumeration(inv)
-    swaps = find_swaps(b,padding)
+def _factorizeT(inv,padding):
+    b = _bottom_enumeration(inv)
+    swaps = _find_swaps(b,padding)
     return swaps
 
-def get_lower_hook_size_one(inv):
+def _get_lower_hook_size_one(inv):
     for h in inv:
         if is_lower_hook(h) and size(h) == 1:
             return h
 
-def get_smallest_lower_hook(inv):
+def _get_smallest_lower_hook(inv):
     res = (None, np.inf)
     for h in inv:
         if is_lower_hook(h) and size(h) > 1:
@@ -293,7 +337,7 @@ def get_smallest_lower_hook(inv):
                 res = (h, size(h))
     return res[0]
 
-def get_covers(h, inv):
+def _get_covers(h, inv):
     covers = []
     for e in inv:
         if is_cover(e,h):
@@ -301,10 +345,10 @@ def get_covers(h, inv):
     
     return covers
 
-def factorizeU(inv,padding):
-    h = get_lower_hook_size_one(inv)
-    i,_ = edge_to_int(h)
-    C = get_covers(h, inv)
+def _factorizeU(inv,padding):
+    h = _get_lower_hook_size_one(inv)
+    i,_ = _edge_to_int(h)
+    C = _get_covers(h, inv)
 
     # single partial cover
     single_cover = None
@@ -317,7 +361,7 @@ def factorizeU(inv,padding):
                 break
     
     if single_cover != None:
-        return merge_lower_hook_with_edge(inv, h, single_cover), [f"U{i+padding}"]
+        return _merge_lower_hook_with_edge(inv, h, single_cover), [f"U{i+padding}"]
     
     # single full cover
     single_cover = None
@@ -330,12 +374,12 @@ def factorizeU(inv,padding):
                 break
     
     if single_cover != None:
-        return merge_lower_hook_with_edge(inv, h, single_cover), [f"U{i+padding}"]
+        return _merge_lower_hook_with_edge(inv, h, single_cover), [f"U{i+padding}"]
     
     # full cover lower hooks
     for cover in C:
         if is_lower_hook(cover):
-            return merge_lower_hook_with_edge(inv, h, cover), [f"U{i+padding}"]
+            return _merge_lower_hook_with_edge(inv, h, cover), [f"U{i+padding}"]
     
     # pick one full cover at random
     full_covers = []
@@ -344,10 +388,10 @@ def factorizeU(inv,padding):
             full_covers.append(cover)
 
     cover = random.choice(full_covers)
-    return merge_lower_hook_with_edge(inv, h, cover), [f"U{i+padding}"]
+    return _merge_lower_hook_with_edge(inv, h, cover), [f"U{i+padding}"]
 
-def interior_edges(inv, h):
-    h1,h2 = edge_to_int(h)
+def _interior_edges(inv, h):
+    h1,h2 = _edge_to_int(h)
     non_zero_int = []
     zero_int = []
     for edge in inv:
@@ -357,7 +401,7 @@ def interior_edges(inv, h):
         if is_upper_hook(edge):
             continue
 
-        e1,e2 = edge_to_int(edge)
+        e1,e2 = _edge_to_int(edge)
         if is_transversal(edge):
             if h1 < e2 < h2:
                 if is_zero_transversal(edge):
@@ -371,15 +415,15 @@ def interior_edges(inv, h):
     return non_zero_int, zero_int
 
 
-def factorizeH(inv,padding):
-    h = get_smallest_lower_hook(inv)
-    h1,h2 = edge_to_int(h)
-    non_zero_int, zero_int = interior_edges(inv, h)
+def _factorizeH(inv,padding):
+    h = _get_smallest_lower_hook(inv)
+    h1,h2 = _edge_to_int(h)
+    non_zero_int, zero_int = _interior_edges(inv, h)
 
     interior = non_zero_int + zero_int
     val_lookup = {}
     for edge in interior:
-        e1,e2 = edge_to_int(edge)
+        e1,e2 = _edge_to_int(edge)
         if is_positive_transversal(edge):
             val_lookup[e2 - h1] = +1
         elif is_lower_hook(edge) and e2 > h2:
@@ -393,7 +437,7 @@ def factorizeH(inv,padding):
 
     locations = [0]*size(h)
     for edge in non_zero_int:
-        e1,e2 = edge_to_int(edge)
+        e1,e2 = _edge_to_int(edge)
         if is_lower_hook(edge) and e2 > h2:
             locations[0] += val_lookup[e1 - h1]
         else:
@@ -417,9 +461,9 @@ def factorizeH(inv,padding):
     for i in range(size(h)+h1-1,j+h1-1,-1):
         R.append(f"T{i}")
     
-    g = inv_to_graph(inv)
+    g = _inv_to_graph(inv)
     LR = L + R
-    result = compose(LR, len(inv), g)
+    result = _compose(LR, len(inv), g)
     L = []
     for i in range(h1,h1+j-1):
         L.append(f"T{i+padding}")
@@ -430,34 +474,42 @@ def factorizeH(inv,padding):
     return result, L[::-1] + R[::-1]
 
 def factorize(inv):
+    '''
+    Returns a factor list for every partition of the input tangle.
+    '''
     return _factorize(inv, 0)
 
 def _factorize(inv, original_padding):
     partitions = get_partitions(inv)
-    factor_list = []
+    factor_lists = []
     for tangle, padding in partitions:
-        factor_list.extend(_factorize_impl(tangle, padding + original_padding))
+        factors = _factorize_impl(tangle, padding + original_padding)
+        if len(factors) != 0:
+            factor_lists.append(factors)
     
-    return factor_list
+    return factor_lists
 
 def _factorize_impl(inv, padding):
 
     if is_I(inv):
-        return ["I"]
+        return []
     
     if is_T_tangle(inv):
-        return factorizeT(inv, padding)
+        return _factorizeT(inv, padding)
     
     if is_U_tangle(inv):
-        new_inv, u = factorizeU(inv, padding)
-        return _factorize(new_inv, padding) + u
+        new_inv, u = _factorizeU(inv, padding)
+        return _factorize_impl(new_inv, padding) + u
     
     if is_H_tangle(inv):
-        new_inv, ts = factorizeH(inv, padding)
-        new_inv, u = factorizeU(new_inv, padding)
-        return _factorize(new_inv, padding) + u + ts
+        new_inv, ts = _factorizeH(inv, padding)
+        new_inv, u = _factorizeU(new_inv, padding)
+        return _factorize_impl(new_inv, padding) + u + ts
 
 def text_to_inv(text):
+    '''
+    Returns a list representation of a tangle written in a string representation 
+    '''
     inv = []
     pairs = text.split(",")
     for pair in pairs:
@@ -467,6 +519,9 @@ def text_to_inv(text):
     return inv
 
 def inv_to_text(inv):
+    '''
+    Returns a string representation of a tangle written in a list representation 
+    '''
     s = ""
     for i, (a,b) in enumerate(inv):
             end = ","
@@ -475,18 +530,21 @@ def inv_to_text(inv):
             s += f"{a}:{b}{end}"
     return s
 
-def is_gap_crossed(inv, n):
+def _is_gap_crossed(inv, n):
     for edge in inv:
-        e1, e2 = edge_to_int(edge)
+        e1, e2 = _edge_to_int(edge)
         if e1 <= n and e2 > n or e1 >= n and e2 < n:
             return True
     return False
 
 def get_partitions(inv):
+    '''
+    Returns the partitions of the input tangle.
+    '''
     parts = [[1, None]]
     n = len(inv)
     for i in range(1, n):
-        if not is_gap_crossed(inv, i):
+        if not _is_gap_crossed(inv, i):
             parts[-1][-1] = i
             parts.append([i+1, None])
     
@@ -496,7 +554,7 @@ def get_partitions(inv):
     for p1,p2 in parts:
         partition = []
         for edge in inv:
-            e1,e2 = edge_to_int(edge)
+            e1,e2 = _edge_to_int(edge)
             if p1 <= e1 and e2 <= p2:
                 e1 = f"{(e1 - p1 + 1)}" if "'" not in edge[0] else f"{(e1 - p1 + 1)}'"
                 e2 = f"{(e2 - p1 + 1)}" if "'" not in edge[1] else f"{(e2 - p1 + 1)}'"
@@ -505,3 +563,100 @@ def get_partitions(inv):
         partitions_list.append((partition, p1-1))
     
     return partitions_list
+
+
+def init():
+    ''' Initilizes the maude package.
+    '''
+    
+    maude.init()
+    maude.load('brauer.maude')
+
+
+def reduce(factor_list, max_patience = "auto"):
+    ''' Reduces the input term as an equivalent and (possibly) smaller factorization. \n
+    Arguments:
+        factor_list : the factor list to be reduced \n
+        max_patience : integer, str (default: auto), how many steps inside a local minima are you willing to perform. If "auto" is equal to 1000 * length of term
+    '''
+
+    factor_list = [factor for factor in factor_list if factor != "I"]
+
+    # covert factor list to Maude term
+    term = []
+    for factor in factor_list:
+        if factor == "I": continue
+
+        term.append(f"{factor[0]} {factor[1:]}")
+
+    term = ",".join(term)
+
+    strategy_rule = "(delete ! | move)*"
+
+    brauer = maude.getModule("REW-RULES")
+    try:
+        t = brauer.parseTerm(term)
+    except:
+        raise Exception("An error has occurred. Have you called init() before rewrite()?")
+        
+
+    t_len = brauer.parseTerm(f"length({term})")
+    t_len.reduce()
+    t_len = t_len.toInt()
+
+    if max_patience == "auto":
+        max_patience = 1000 * t_len
+
+    # calculate the max number of factors the term can have
+    N = brauer.parseTerm(f"max_idx({term})")
+    N.reduce()
+    N = N.toInt() + 1
+    factors_upper_bound = N * (N - 1) / 2
+
+    strategy = brauer.parseStrategy(strategy_rule)
+    
+    # perform srew with depth first search
+    results = t.srewrite(strategy, True)
+    current_patience = max_patience
+    for res in results:
+        # calculate result length
+        l = brauer.parseTerm(f"length({res[0]})")
+        l.reduce()
+        l = l.toInt()
+
+        if l < t_len:
+            # covert Maude term to factor list
+            reduced_factor_list = []
+            for factor in str(res[0]).split(","):
+                reduced_factor_list.append(factor.replace(" ", ""))
+            
+            return reduce(reduced_factor_list, max_patience)
+        elif l > t_len:
+            # stop looping because we have reached the bottom of the tree
+            break
+        elif l <= factors_upper_bound:
+            # do not start to lose patience until we have reached the upper bound
+            current_patience -= 1
+        
+        if current_patience <= 0:
+            # stop looping if patience was lost
+            break
+
+    # no better solution was found
+
+    return factor_list
+
+def factorize_reduce(inv, max_patience = "auto"):
+    '''
+    Returns the minimal factor list for the input tangle. \n
+    Arguments:
+        inv : the tangle to be factorized in list representation \n
+        max_patience : integer, str (default: auto), how many steps inside a local minima are you willing to perform. If "auto" is equal to 1000 * length of term
+    '''    
+    factor_lists = factorize(inv)
+    final_factor_list = []
+    for factor_list in factor_lists:
+        reduced_factor_list = reduce(factor_list, max_patience)
+        final_factor_list.extend(reduced_factor_list)
+    
+    return final_factor_list
