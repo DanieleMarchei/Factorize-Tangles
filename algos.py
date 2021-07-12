@@ -104,7 +104,7 @@ def generate_primes(N):
         I.add_edge(str(n+1), str(n+1)+"'")
 
 
-    primes_dict = {}
+    primes_dict = {"I" : I}
 
     for u in range(1,N):
         U=nx.Graph()
@@ -134,13 +134,13 @@ def generate_primes(N):
 
         primes_dict["T"+str(t)] = T
     
-    return I, primes_dict
+    return primes_dict
 
 def compose(factors, N, start = "I"):
-    I, primes_dict = generate_primes(N)
+    primes_dict = generate_primes(N)
 
     if start == "I":
-        composition = I
+        composition = primes_dict["I"]
     else:
         composition = start
     
@@ -266,18 +266,18 @@ def bottom_enumeration(inv):
     
     return b
 
-def find_swaps(b):
+def find_swaps(b,padding):
     factor_list = []
     for j in range(len(b)):
         for i in range(len(b) - 1 - j):
             if b[i] > b[i + 1]:
                 b[i], b[i + 1] = b[i + 1], b[i]
-                factor_list.append(f"T{i+1}")
+                factor_list.append(f"T{i+1+padding}")
     return factor_list
 
-def factorizeT(inv):
+def factorizeT(inv,padding):
     b = bottom_enumeration(inv)
-    swaps = find_swaps(b)
+    swaps = find_swaps(b,padding)
     return swaps
 
 def get_lower_hook_size_one(inv):
@@ -301,7 +301,7 @@ def get_covers(h, inv):
     
     return covers
 
-def factorizeU(inv):
+def factorizeU(inv,padding):
     h = get_lower_hook_size_one(inv)
     i,_ = edge_to_int(h)
     C = get_covers(h, inv)
@@ -317,7 +317,7 @@ def factorizeU(inv):
                 break
     
     if single_cover != None:
-        return merge_lower_hook_with_edge(inv, h, single_cover), [f"U{i}"]
+        return merge_lower_hook_with_edge(inv, h, single_cover), [f"U{i+padding}"]
     
     # single full cover
     single_cover = None
@@ -330,12 +330,12 @@ def factorizeU(inv):
                 break
     
     if single_cover != None:
-        return merge_lower_hook_with_edge(inv, h, single_cover), [f"U{i}"]
+        return merge_lower_hook_with_edge(inv, h, single_cover), [f"U{i+padding}"]
     
     # full cover lower hooks
     for cover in C:
         if is_lower_hook(cover):
-            return merge_lower_hook_with_edge(inv, h, cover), [f"U{i}"]
+            return merge_lower_hook_with_edge(inv, h, cover), [f"U{i+padding}"]
     
     # pick one full cover at random
     full_covers = []
@@ -344,7 +344,7 @@ def factorizeU(inv):
             full_covers.append(cover)
 
     cover = random.choice(full_covers)
-    return merge_lower_hook_with_edge(inv, h, cover), [f"U{i}"]
+    return merge_lower_hook_with_edge(inv, h, cover), [f"U{i+padding}"]
 
 def interior_edges(inv, h):
     h1,h2 = edge_to_int(h)
@@ -371,7 +371,7 @@ def interior_edges(inv, h):
     return non_zero_int, zero_int
 
 
-def factorizeH(inv):
+def factorizeH(inv,padding):
     h = get_smallest_lower_hook(inv)
     h1,h2 = edge_to_int(h)
     non_zero_int, zero_int = interior_edges(inv, h)
@@ -420,26 +420,42 @@ def factorizeH(inv):
     g = inv_to_graph(inv)
     LR = L + R
     result = compose(LR, len(inv), g)
+    L = []
+    for i in range(h1,h1+j-1):
+        L.append(f"T{i+padding}")
+    
+    R = []
+    for i in range(size(h)+h1-1,j+h1-1,-1):
+        R.append(f"T{i+padding}")
     return result, L[::-1] + R[::-1]
 
 def factorize(inv):
-    # print(inv_to_text(inv))
+    return _factorize(inv, 0)
+
+def _factorize(inv, original_padding):
+    partitions = get_partitions(inv)
+    factor_list = []
+    for tangle, padding in partitions:
+        factor_list.extend(_factorize_impl(tangle, padding + original_padding))
+    
+    return factor_list
+
+def _factorize_impl(inv, padding):
 
     if is_I(inv):
         return ["I"]
     
     if is_T_tangle(inv):
-        return factorizeT(inv)
+        return factorizeT(inv, padding)
     
     if is_U_tangle(inv):
-        new_inv, u = factorizeU(inv)
-        return factorize(new_inv) + u
+        new_inv, u = factorizeU(inv, padding)
+        return _factorize(new_inv, padding) + u
     
     if is_H_tangle(inv):
-        new_inv, ts = factorizeH(inv)
-        # print(inv_to_text(new_inv))
-        new_inv, u = factorizeU(new_inv)
-        return factorize(new_inv) + u + ts
+        new_inv, ts = factorizeH(inv, padding)
+        new_inv, u = factorizeU(new_inv, padding)
+        return _factorize(new_inv, padding) + u + ts
 
 def text_to_inv(text):
     inv = []
@@ -458,3 +474,34 @@ def inv_to_text(inv):
                 end = ""
             s += f"{a}:{b}{end}"
     return s
+
+def is_gap_crossed(inv, n):
+    for edge in inv:
+        e1, e2 = edge_to_int(edge)
+        if e1 <= n and e2 > n or e1 >= n and e2 < n:
+            return True
+    return False
+
+def get_partitions(inv):
+    parts = [[1, None]]
+    n = len(inv)
+    for i in range(1, n):
+        if not is_gap_crossed(inv, i):
+            parts[-1][-1] = i
+            parts.append([i+1, None])
+    
+    parts[-1][-1] = n
+    
+    partitions_list = []
+    for p1,p2 in parts:
+        partition = []
+        for edge in inv:
+            e1,e2 = edge_to_int(edge)
+            if p1 <= e1 and e2 <= p2:
+                e1 = f"{(e1 - p1 + 1)}" if "'" not in edge[0] else f"{(e1 - p1 + 1)}'"
+                e2 = f"{(e2 - p1 + 1)}" if "'" not in edge[1] else f"{(e2 - p1 + 1)}'"
+                partition.append((e1,e2))
+
+        partitions_list.append((partition, p1-1))
+    
+    return partitions_list

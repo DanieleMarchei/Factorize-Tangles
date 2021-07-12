@@ -2,6 +2,7 @@ from numpy import tan
 from algos import factorize,inv_to_text,compose, is_I
 from rewrite import *
 from random import choice
+from time import time
 
 def random_tangle(N):
     nodes = []
@@ -23,11 +24,13 @@ def random_tangle(N):
 init()
 N = 15
 for n in range(3,N):
+    print(n)
+    start = time()
     for _ in range(10*N):
         tangle = random_tangle(n)
         if is_I(tangle):
             continue
-
+        
         factors = factorize(tangle)
         factors = rewrite(factors)
         minimal_tangle = compose(factors, n)
@@ -35,3 +38,5 @@ for n in range(3,N):
             print(tangle)
             print(minimal_tangle)
             exit(1)
+    end = time()
+    print("time : ",end - start)
