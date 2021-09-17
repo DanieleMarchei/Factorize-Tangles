@@ -500,7 +500,7 @@ def _factorize_impl(inv, padding, is_optimal = True):
     if is_U_tangle(inv):
         new_inv, u = _factorizeU(inv, padding)
         res = _factorize_impl(new_inv, padding, False)
-        res[0].append(u)
+        res[0].extend(u)
         return res
     
     # is H tangle by exclusion
