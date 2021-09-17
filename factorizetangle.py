@@ -142,7 +142,7 @@ def compose(factor_list, N):
     Composes the factors in the input factor list to obtain the tangle they create.
     '''
     primes_dict = _generate_primes(N)    
-
+    composition = primes_dict["I"]
     for f in factor_list:
         composition, inv_composition = _product(composition, primes_dict[f], N)
     
@@ -483,28 +483,32 @@ def _factorize(inv, original_padding):
     partitions = get_partitions(inv)
     factor_lists = []
     for tangle, padding in partitions:
-        factors = _factorize_impl(tangle, padding + original_padding)
+        factors, is_optimal = _factorize_impl(tangle, padding + original_padding)
         if len(factors) != 0:
-            factor_lists.append(factors)
+            factor_lists.append((factors, is_optimal))
     
     return factor_lists
 
-def _factorize_impl(inv, padding):
+def _factorize_impl(inv, padding, is_optimal = True):
 
     if is_I(inv):
-        return []
+        return [], is_optimal
     
     if is_T_tangle(inv):
-        return _factorizeT(inv, padding)
+        return _factorizeT(inv, padding), is_optimal
     
     if is_U_tangle(inv):
         new_inv, u = _factorizeU(inv, padding)
-        return _factorize_impl(new_inv, padding) + u
+        res = _factorize_impl(new_inv, padding, False)
+        res[0].append(u)
+        return res
     
-    if is_H_tangle(inv):
-        new_inv, ts = _factorizeH(inv, padding)
-        new_inv, u = _factorizeU(new_inv, padding)
-        return _factorize_impl(new_inv, padding) + u + ts
+    # is H tangle by exclusion
+    new_inv, ts = _factorizeH(inv, padding)
+    new_inv, u = _factorizeU(new_inv, padding)
+    res = _factorize_impl(new_inv, padding, False)
+    res[0].extend(u + ts)
+    return res
 
 def text_to_inv(text):
     '''
@@ -655,8 +659,10 @@ def factorize_reduce(inv, max_patience = "auto"):
     '''    
     factor_lists = factorize(inv)
     final_factor_list = []
-    for factor_list in factor_lists:
-        reduced_factor_list = reduce(factor_list, max_patience)
+    for factor_list, is_optimal in factor_lists:
+        reduced_factor_list = factor_list
+        if not is_optimal:
+            reduced_factor_list = reduce(factor_list, max_patience)
         final_factor_list.extend(reduced_factor_list)
     
     return final_factor_list
