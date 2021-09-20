@@ -2,7 +2,13 @@ import numpy as np
 import networkx as nx
 import random
 import maude
+from functools import cmp_to_key 
+import re
 
+_UNDER = "U"
+_ABOVE = "A"
+_TYPE_DELIMITER = "_"
+_ID_DELIMITER = "#"
 
 def _inv_to_graph(inv):
     g = nx.Graph()
@@ -261,6 +267,27 @@ def _merge_lower_hook_with_edge(inv : list, h, edge):
     G = _inv_to_graph(result)
     return _get_inv(G, len(result))[0]
 
+def _are_intersecting_edges(edge1, edge2):
+    e1_1, e1_2 = _edge_to_int(edge1)
+    e2_1, e2_2 = _edge_to_int(edge2)
+    if e1_1 > e2_1:
+        return _are_intersecting_edges(edge2, edge1)
+    
+    if is_transversal(edge1) and is_transversal(edge2):
+        return e1_1 < e2_1 and e2_2 < e1_2
+    if is_hook(edge1) and is_hook(edge2):
+        return e1_1 < e2_1 < e1_2 < e2_2
+    if is_upper_hook(edge1) and is_transversal(edge2):
+        return e1_1 < e2_1 < e1_2 < e2_2
+    if is_lower_hook(edge1) and is_transversal(edge2):
+        return e1_1 < e2_2 < e1_2
+    if is_transversal(edge1) and is_lower_hook(edge2):
+        return e2_1 < e1_2 < e2_2
+    if is_transversal(edge1) and is_upper_hook(edge2):
+        return e2_1 < e1_1 < e2_2
+
+    raise Exception(f"Error in edge type. {edge1} {edge2}")
+
 
 def is_cover(edge, h):
     '''
@@ -301,6 +328,32 @@ def is_H_tangle(inv):
     Returns True if the input tangle is a H-tangle and False otherwise.
     '''
     return not is_T_tangle(inv) and not is_U_tangle(inv)
+
+def is_TL_tangle(inv):
+    '''
+    Returns True if the input tangle is a TL-tangle and False otherwise.
+    '''
+    if is_I(inv): return False
+
+    memoize_table = set()
+
+    for edge1 in inv:
+        for edge2 in inv:
+            if edge1 == edge2:
+                continue
+
+            text_1 = inv_to_text([edge1])
+            text_2 = inv_to_text([edge2])
+
+            if text_1 + text_2 in memoize_table:
+                continue
+
+            if _are_intersecting_edges(edge1, edge2):
+                return False
+            
+            memoize_table.add(text_2 + text_1)
+    
+    return True
 
 def _bottom_enumeration(inv):
     b = []
@@ -473,6 +526,187 @@ def _factorizeH(inv,padding):
         R.append(f"T{i+padding}")
     return result, L[::-1] + R[::-1]
 
+
+def _get_edges_that_cross_gap(inv, n):
+    for edge in inv:
+        e1, e2 = _edge_to_int(edge)
+        if e1 <= n and e2 > n or e1 > n and e2 <= n:
+            yield edge
+    return []
+
+def _is_above(edge1, edge2):
+    e1_1, e1_2 = _edge_to_int(edge1)
+    e2_1, e2_2 = _edge_to_int(edge2)
+
+    if is_hook(edge1) and is_hook(edge2):
+        e1_above_e2 = is_upper_hook(edge1) and is_lower_hook(edge2)
+        if e1_above_e2:
+            return True
+
+        e1_under_e2 = is_lower_hook(edge1) and is_upper_hook(edge2)
+        if e1_under_e2:
+            return False
+
+        e1_inside_e2 = (e1_1 > e2_1 and e1_2 < e2_2)
+        both_upper = is_upper_hook(edge1) and is_upper_hook(edge2)
+        if both_upper and e1_inside_e2:
+            return True
+        
+        if not both_upper and e1_inside_e2:
+            return False
+        
+    elif is_hook(edge1) and is_transversal(edge2):
+        return is_upper_hook(edge1)
+    elif is_transversal(edge1) and is_hook(edge2):
+        return is_lower_hook(edge2)
+    else:
+        a = is_positive_transversal(edge1) and e1_1 < e2_1
+        b = is_negative_transversal(edge1) and e1_1 > e2_1
+        return a or b
+
+def _create_column_table(inv):
+    table = []
+    for i in range(1,len(inv)):
+        table.append(list(_get_edges_that_cross_gap(inv, i)))
+    
+    return table
+
+def _sort_edges_in_place(table, inv):
+    key = cmp_to_key(lambda a,b : -1 if _is_above(a,b) else 1)
+    for i in range(len(inv)-1):
+        table[i].sort(key = key)
+
+    return table
+
+
+def _create_regions(table):
+    regions = []
+    for col in table:
+        reg = []
+        for edge in col:
+            is_hook_of_size_one = is_hook(edge) and size(edge) == 1
+            if not is_hook_of_size_one:
+                if len(reg) > 0 and _UNDER in reg[-1]:
+                    reg[-1] += f"{_ID_DELIMITER}{_ABOVE}{_TYPE_DELIMITER}" + inv_to_text([edge])
+                else:
+                    reg.append(f"{_ABOVE}{_TYPE_DELIMITER}" + inv_to_text([edge]))
+
+                reg.append(f"{_UNDER}{_TYPE_DELIMITER}" + inv_to_text([edge]))
+            else:
+                reg.append(inv_to_text([edge]))
+        regions.append(reg)
+    
+    return regions
+
+def _filter_one_regions(regions):
+    one_regions = []
+    for col in regions:
+        one_reg = []
+        for i, reg in enumerate(col):
+            if i % 2 == 1:
+                one_reg.append(reg)
+        one_regions.append(one_reg)
+    
+    return one_regions
+
+def _is_parent_of(reg1, reg2):
+    tokens_1 = re.split("#|_", reg1)
+    tokens_2 = re.split("#|_", reg2)
+    if len(tokens_1) == 2 and len(tokens_2) == 2:
+        type1, name1 = tokens_1
+        type2, name2 = tokens_2
+        
+        return type1 == _ABOVE and type2 == _UNDER
+
+    elif len(tokens_1) != 2 and len(tokens_2) == 2:
+        type1, name1, type1_2, name1_2 = tokens_1
+        type2, name2 = tokens_2
+        if name1 == name2:
+            return False
+        
+        if name1_2 == name2:
+            return True
+
+    elif len(tokens_1) == 2 and len(tokens_2) != 2:
+        type1, name1 = tokens_1
+        type2, name2, type2_2, name2_2 = tokens_2
+        if name1 == name2:
+            return True
+        
+        if name1 == name2_2:
+            return False
+    elif len(tokens_1) != 2 and len(tokens_2) != 2:
+        type1, name1, type1_2, name1_2 = tokens_1
+        type2, name2, type2_2, name2_2 = tokens_2
+
+        if name1 == name2_2:
+            return False
+        
+        if name1_2 == name2:
+            return True
+    
+    return False
+
+def _create_polytree(one_regions):
+    tree = nx.DiGraph()
+    for i,col in enumerate(one_regions):
+        for j,_ in enumerate(col):
+            tree.add_node(str(i+1) + "'" * j, depth = 0)
+
+    for r in range(len(one_regions)-1):
+        for i, reg1 in enumerate(one_regions[r]):
+            for j, reg2 in enumerate(one_regions[r+1]):
+                if _is_parent_of(reg1, reg2):
+                    tree.add_edge(str(r+1) + "'" * i, str(r+2) + "'" * j)
+                if _is_parent_of(reg2, reg1):
+                    tree.add_edge(str(r+2) + "'" * j, str(r+1) + "'" * i)
+
+    return tree
+
+def _dfs(tree, source):
+    for succ in tree.successors(source):
+        depths = nx.get_node_attributes(tree, "depth")
+        if depths[source] + 1 > depths[succ]:
+            depths[succ] = depths[source] + 1
+            nx.set_node_attributes(tree, depths, name = "depth")
+            _dfs(tree, succ)
+
+
+def _traverse_polytree(tree, padding):
+    roots = [n for n,d in tree.in_degree if d == 0]
+    for root in roots:
+        _dfs(tree, root)
+    
+    depths = [] 
+    for _ in range(len(tree.nodes())):
+        depths.append([])
+
+    for node, d in tree.nodes(data = True):
+        depths[d["depth"]].append(node)
+    
+    factors = []
+    for l in depths:
+        if len(l) == 0:
+            continue
+        
+        for n in l:
+            if "'" in n:
+                i = int(n.replace("'", ""))
+            else:
+                i = int(n)
+            factors.append(f"U{i+padding}")
+    
+    return factors   
+
+def _factorizeTL(inv, padding = 0):
+    table = _create_column_table(inv)
+    _sort_edges_in_place(table, inv)
+    regions = _create_regions(table)
+    regions = _filter_one_regions(regions)
+    tree = _create_polytree(regions)
+    factors = _traverse_polytree(tree, padding)
+    return factors
+
 def factorize(inv):
     '''
     Returns a factor list for every partition of the input tangle.
@@ -496,6 +730,9 @@ def _factorize_impl(inv, padding, is_optimal = True):
     
     if is_T_tangle(inv):
         return _factorizeT(inv, padding), is_optimal
+    
+    if is_TL_tangle(inv):
+        return _factorizeTL(inv, padding), is_optimal
     
     if is_U_tangle(inv):
         new_inv, u = _factorizeU(inv, padding)
@@ -537,7 +774,7 @@ def inv_to_text(inv):
 def _is_gap_crossed(inv, n):
     for edge in inv:
         e1, e2 = _edge_to_int(edge)
-        if e1 <= n and e2 > n or e1 >= n and e2 < n:
+        if e1 <= n and e2 > n or e1 > n and e2 <= n:
             return True
     return False
 
