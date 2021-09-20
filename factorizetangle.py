@@ -278,7 +278,7 @@ def _are_intersecting_edges(edge1, edge2):
     if is_hook(edge1) and is_hook(edge2):
         return e1_1 < e2_1 < e1_2 < e2_2
     if is_upper_hook(edge1) and is_transversal(edge2):
-        return e1_1 < e2_1 < e1_2 < e2_2
+        return e1_1 < e2_1 < e1_2
     if is_lower_hook(edge1) and is_transversal(edge2):
         return e1_1 < e2_2 < e1_2
     if is_transversal(edge1) and is_lower_hook(edge2):
@@ -341,6 +341,9 @@ def is_TL_tangle(inv):
         for edge2 in inv:
             if edge1 == edge2:
                 continue
+
+            if is_hook(edge2) and size(edge2) % 2 == 0:
+                return False
 
             text_1 = inv_to_text([edge1])
             text_2 = inv_to_text([edge2])
