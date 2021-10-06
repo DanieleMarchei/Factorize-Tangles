@@ -12,7 +12,7 @@ Software requirements
 
 To install The Maude System please refer to [http://maude.cs.illinois.edu/w/index.php/The_Maude_System](http://maude.cs.illinois.edu/w/index.php/The_Maude_System).
 
-To install factorizetangle just clone this repository into the same folder of your project.
+To install factorizetangles just clone this repository into the same folder of your project.
 
 # Usage
 See "test.py" for usage example.
