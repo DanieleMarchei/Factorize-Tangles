@@ -917,3 +917,40 @@ def factorize_reduce(inv, max_patience = "auto"):
         final_factor_list.extend(reduced_factor_list)
     
     return final_factor_list
+
+def find_equivalent(factor_list):
+    ''' Returns all the equivalent factor lists, assuming factor_list is already minimal. \n
+    Arguments:
+        factor_list : the minimal factor list to be rewritten in equivalent forms \n
+    '''
+
+    factor_list = [factor for factor in factor_list if factor != "I"]
+
+    # covert factor list to Maude term
+    term = []
+    for factor in factor_list:
+        if factor == "I": continue
+
+        term.append(f"{factor[0]} {factor[1:]}")
+
+    term = ",".join(term)
+
+    brauer = maude.getModule("REW-RULES")
+    try:
+        t = brauer.parseTerm(term)
+    except:
+        raise Exception("An error has occurred. Have you called init() before this function?")
+        
+
+    strategy = brauer.parseStrategy("move *")
+    
+    # perform srew with depth first search
+    results = t.srewrite(strategy, True)
+
+    for res in results:
+
+        equivalent_factor_list = []
+        for factor in str(res[0]).split(","):
+            equivalent_factor_list.append(factor.replace(" ", ""))
+        
+        yield equivalent_factor_list
