@@ -154,6 +154,13 @@ def compose(factor_list, N):
     
     return inv_composition
 
+def normal_form(inv):
+    '''
+    Enumerates all the edges from left to right and from top to bottom.
+    '''
+    g = _inv_to_graph(inv)
+    return _get_inv(g, len(inv))[0]
+
 def _compose(factor_list, N, start = "I"):
     primes_dict = _generate_primes(N)
 
