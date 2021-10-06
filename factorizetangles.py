@@ -161,6 +161,13 @@ def normal_form(inv):
     g = _inv_to_graph(inv)
     return _get_inv(g, len(inv))[0]
 
+def to_latex(factor_list):
+    latex = []
+    for f in factor_list:
+        latex.append(f"{f[0]}_{f[1:]}")
+    
+    return f' \circ '.join(latex)
+
 def _compose(factor_list, N, start = "I"):
     primes_dict = _generate_primes(N)
 
