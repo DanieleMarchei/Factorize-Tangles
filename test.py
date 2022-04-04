@@ -14,18 +14,6 @@ print(f"factors = {factors}")
 latex = to_latex(factors)
 print("latex = " + latex)
 
-# find all equivalent minimal factor lists
-equivalent_factorizations = find_equivalent(factors)
-print("Or equivalently")
-counter = 0
-for equivalent in equivalent_factorizations:
-    if counter < 10:
-        print(",".join(equivalent))
-        counter += 1 
-    else:
-        break
-
-
 # compose the minimal factor list in order to obtain the original tangle
 minimal_tangle = compose(factors, len(inv))
 

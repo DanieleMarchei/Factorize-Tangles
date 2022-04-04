@@ -1,6 +1,5 @@
 import numpy as np
 import networkx as nx
-import random
 import maude
 from functools import cmp_to_key 
 import re
@@ -154,20 +153,6 @@ def compose(factor_list, N):
     
     return inv_composition
 
-def normal_form(inv):
-    '''
-    Enumerates all the edges from left to right and from top to bottom.
-    '''
-    g = _inv_to_graph(inv)
-    return _get_inv(g, len(inv))[0]
-
-def to_latex(factor_list):
-    latex = []
-    for f in factor_list:
-        latex.append(f"{f[0]}_{f[1:]}")
-    
-    return f' \circ '.join(latex)
-
 def _compose(factor_list, N, start = "I"):
     primes_dict = _generate_primes(N)
 
@@ -282,29 +267,57 @@ def _merge_lower_hook_with_edge(inv : list, h, edge):
     return _get_inv(G, len(result))[0]
 
 def _are_intersecting_edges(edge1, edge2):
-    e1_1, e1_2 = _edge_to_int(edge1)
-    e2_1, e2_2 = _edge_to_int(edge2)
-    if e1_1 > e2_1:
-        return _are_intersecting_edges(edge2, edge1)
-    
-    if is_transversal(edge1) and is_transversal(edge2):
-        return e1_1 < e2_1 and e2_2 < e1_2
-    if is_hook(edge1) and is_hook(edge2):
-        if is_upper_hook(edge1) and is_lower_hook(edge2):
-            return False
-        if is_lower_hook(edge1) and is_upper_hook(edge2):
-            return False
-        return e1_1 < e2_1 < e1_2 < e2_2
-    if is_upper_hook(edge1) and is_transversal(edge2):
-        return e1_1 < e2_1 < e1_2
-    if is_lower_hook(edge1) and is_transversal(edge2):
-        return e1_1 < e2_2 < e1_2
-    if is_transversal(edge1) and is_lower_hook(edge2):
-        return e2_1 < e1_2 < e2_2
-    if is_transversal(edge1) and is_upper_hook(edge2):
-        return e2_1 < e1_1 < e2_2
+    a1, a2 = _edge_to_int(edge1)
+    b1, b2 = _edge_to_int(edge2)
 
-    raise Exception(f"Error in edge type. {edge1} {edge2}")
+    n = 2*max(a1,a2,b1,b2)
+
+    if "'" not in edge1[0]:
+        a1 = -a1 % n + 1
+    if "'" not in edge1[1]:
+        a2 = -a2 % n + 1
+    
+    if "'" not in edge2[0]:
+        b1 = -b1 % n + 1
+    if "'" not in edge2[1]:
+        b2 = -b2 % n + 1
+    
+    if a1 > a2:
+        a1,a2 = a2,a1
+    
+    if b1 > b2:
+        b1,b2 = b2,b1
+
+    a_b = a1 <= b1 <= a2 <= b2
+    b_a = b1 <= a1 <= b2 <= a2
+
+    return a_b or b_a
+
+
+# def _are_intersecting_edges(edge1, edge2):
+#     e1_1, e1_2 = _edge_to_int(edge1)
+#     e2_1, e2_2 = _edge_to_int(edge2)
+#     if e1_1 > e2_1:
+#         return _are_intersecting_edges(edge2, edge1)
+    
+#     if is_transversal(edge1) and is_transversal(edge2):
+#         return e1_1 < e2_1 and e2_2 < e1_2
+#     if is_hook(edge1) and is_hook(edge2):
+#         if is_upper_hook(edge1) and is_lower_hook(edge2):
+#             return False
+#         if is_lower_hook(edge1) and is_upper_hook(edge2):
+#             return False
+#         return e1_1 < e2_1 < e1_2 < e2_2
+#     if is_upper_hook(edge1) and is_transversal(edge2):
+#         return e1_1 < e2_1 < e1_2
+#     if is_lower_hook(edge1) and is_transversal(edge2):
+#         return e1_1 < e2_2 < e1_2
+#     if is_transversal(edge1) and is_lower_hook(edge2):
+#         return e2_1 < e1_2 < e2_2
+#     if is_transversal(edge1) and is_upper_hook(edge2):
+#         return e2_1 < e1_1 < e2_2
+
+#     raise Exception(f"Error in edge type. {edge1} {edge2}")
 
 
 def is_cover(edge, h):
@@ -403,6 +416,60 @@ def _get_lower_hook_size_one(inv):
         if is_lower_hook(h) and size(h) == 1:
             return h
 
+def _get_all_smallest_lower_hooks(inv):
+    smallest = np.inf
+    for h in inv:
+        if is_lower_hook(h):
+            if size(h) < smallest:
+                smallest = size(h)
+    
+    for h in inv:
+        if is_lower_hook(h) and size(h) == smallest:
+            yield h
+
+def _interior_edges_with_smaller_hooks(inv, h):
+    h1,h2 = _edge_to_int(h)
+    interiors = []
+    for edge in inv:
+        if edge == h:
+            continue
+
+        if is_upper_hook(edge):
+            continue
+
+        e1,e2 = _edge_to_int(edge)
+        if is_transversal(edge):
+            if h1 < e2 < h2:
+                interiors.append(edge)
+        else:
+            if e1 < h1 < e2 < h2 or h1 < e1 < h2 < e1 or h1 < e1 < e2 < h2:
+                interiors.append(edge)
+    
+    return interiors
+
+def _get_all_minimal_lower_hooks(inv):
+    '''
+    A minimal lower hook is a lower hook that does not contain the beginning and end of any other lower hook.
+    '''
+    lower_hooks = []
+    for edge in inv:
+        if is_lower_hook(edge) and size(edge) > 1:
+            lower_hooks.append(edge)
+    
+    minimals = []
+    for h in lower_hooks:
+        interiors = _interior_edges_with_smaller_hooks(inv, h)
+        is_minimal = True
+        for interior in interiors:
+            is_minimal &= _are_intersecting_edges(h, interior)
+        
+        if is_minimal:
+            minimals.append(h)
+    
+    return minimals
+
+    
+
 def _get_smallest_lower_hook(inv):
     res = (None, np.inf)
     for h in inv:
@@ -419,50 +486,142 @@ def _get_covers(h, inv):
     
     return covers
 
+# def _factorizeU(inv,padding):
+#     h = _get_lower_hook_size_one(inv)
+#     i,_ = _edge_to_int(h)
+#     C = _get_covers(h, inv)
+
+#     if len(C) > 1:
+#         C = [edge for edge in C if not (is_upper_hook(edge) and size(edge) == 1)]
+
+#     # single partial cover
+#     single_cover = None
+#     for cover in C:
+#         if is_partial_cover(cover,h):
+#             if single_cover == None:
+#                 single_cover = cover
+#             else:
+#                 single_cover = None
+#                 break
+    
+#     if single_cover != None:
+#         return _merge_lower_hook_with_edge(inv, h, single_cover), [f"U{i+padding}"]
+    
+#     # single full cover
+#     single_cover = None
+#     for cover in C:
+#         if is_full_cover(cover,h):
+#             if single_cover == None:
+#                 single_cover = cover
+#             else:
+#                 single_cover = None
+#                 break
+    
+#     if single_cover != None:
+#         return _merge_lower_hook_with_edge(inv, h, single_cover), [f"U{i+padding}"]
+    
+#     # full cover lower hooks
+#     for cover in C:
+#         if is_lower_hook(cover):
+#             return _merge_lower_hook_with_edge(inv, h, cover), [f"U{i+padding}"]
+    
+#     # pick one full cover at random
+#     full_covers = []
+#     for cover in C:
+#         if is_full_cover(cover,h):
+#             full_covers.append(cover)
+
+#     cover = random.choice(full_covers)
+#     return _merge_lower_hook_with_edge(inv, h, cover), [f"U{i+padding}"]
+
+
+def n_intersecting_edges(inv, edge):
+    n = 0
+    for e in inv:
+        if e == edge:
+            continue
+        if _are_intersecting_edges(edge, e):
+            n += 1
+    return n
+
+def n_crossings(inv):
+    n = 0
+    for edge in inv:
+        n += n_intersecting_edges(inv, edge)
+    return n // 2
+
+def _get_intersecting_both_imaginary(inv, h):
+    max_int = 2
+    # max_int = -1
+    # for edge in inv:
+    #     if edge == h: continue
+
+    #     n_intersections = 0
+    #     if above1(edge):
+    #         n_intersections += 1
+        
+    #     if above2(edge):
+    #         n_intersections += 1
+        
+    #     if n_intersections > 0:
+    #         above.append([edge, n_intersections])
+        
+    #     if max_int < n_intersections:
+    #         max_int = n_intersections
+
+    i,_ = _edge_to_int(h)
+
+    above1 = lambda edge : _are_intersecting_edges(edge, [f"{i}",f"{i}'"])
+    above2 = lambda edge : _are_intersecting_edges(edge, [f"{i+1}",f"{i+1}'"])
+
+    above = [edge for edge in inv if edge != h and above1(edge) and above2(edge)]
+
+    assert(len(above) != 0)
+
+    merges = [(_merge_lower_hook_with_edge(inv, h, edge), edge) for edge in above]
+    n_cross_inv = n_crossings(inv)
+
+    candidates_max_int = []
+
+    for m,edge in merges:
+        if n_crossings(m) == n_cross_inv:
+            candidates_max_int.append({
+                "merge" : m,
+                "edge" : edge
+            })
+    
+    return candidates_max_int
+    
+def _get_biggest_edges(m_edges):
+    max_size = -1
+    for m_edge in m_edges:
+        if size(m_edge["edge"]) > max_size:
+            max_size = size(m_edge["edge"])
+
+    return [m_edge for m_edge in m_edges if size(m_edge["edge"]) == max_size]
+
+def _get_min_intersections(inv, m_edges):
+    min_cross = np.inf
+    n_int = {}
+    for m_edge in m_edges:
+        n_int_edges = n_intersecting_edges(inv, m_edge["edge"])
+        n_int[inv_to_text([m_edge["edge"]])] = n_int_edges
+        if n_int_edges < min_cross:
+            min_cross = n_int_edges
+    
+    return [m_edge for m_edge in m_edges if n_int[inv_to_text([m_edge["edge"]])] == min_cross]
+
+
 def _factorizeU(inv,padding):
     h = _get_lower_hook_size_one(inv)
     i,_ = _edge_to_int(h)
-    C = _get_covers(h, inv)
 
-    # single partial cover
-    single_cover = None
-    for cover in C:
-        if is_partial_cover(cover,h):
-            if single_cover == None:
-                single_cover = cover
-            else:
-                single_cover = None
-                break
+    intersecting_imaginary = _get_intersecting_both_imaginary(inv, h)
     
-    if single_cover != None:
-        return _merge_lower_hook_with_edge(inv, h, single_cover), [f"U{i+padding}"]
-    
-    # single full cover
-    single_cover = None
-    for cover in C:
-        if is_full_cover(cover,h):
-            if single_cover == None:
-                single_cover = cover
-            else:
-                single_cover = None
-                break
-    
-    if single_cover != None:
-        return _merge_lower_hook_with_edge(inv, h, single_cover), [f"U{i+padding}"]
-    
-    # full cover lower hooks
-    for cover in C:
-        if is_lower_hook(cover):
-            return _merge_lower_hook_with_edge(inv, h, cover), [f"U{i+padding}"]
-    
-    # pick one full cover at random
-    full_covers = []
-    for cover in C:
-        if is_full_cover(cover,h):
-            full_covers.append(cover)
+    candidates_max_size = _get_biggest_edges(intersecting_imaginary)
 
-    cover = random.choice(full_covers)
-    return _merge_lower_hook_with_edge(inv, h, cover), [f"U{i+padding}"]
+    candidates_min_cross = _get_min_intersections(inv, candidates_max_size)
+    return candidates_min_cross[0]["merge"], [f"U{i+padding}"]    
 
 def _interior_edges(inv, h):
     h1,h2 = _edge_to_int(h)
@@ -488,9 +647,70 @@ def _interior_edges(inv, h):
     
     return non_zero_int, zero_int
 
+def _ordered_interior_edges(inv, h):
+    tangle_dict = {}
+    for edge in inv:
+        tangle_dict[edge[0]] = edge
+        tangle_dict[edge[1]] = edge
 
-def _factorizeH(inv,padding):
-    h = _get_smallest_lower_hook(inv)
+    h1,h2 = _edge_to_int(h)
+    ordered_int = []
+    for i in range(h1+1, h2):
+        ordered_int.append(tangle_dict[f"{i}'"])
+    
+    return ordered_int
+
+def compose_tangle(a,b):
+    assert(len(a) == len(b))
+    N = len(a)
+    ga = _inv_to_graph(a)
+    gb = _inv_to_graph(b)
+    _, inv =_product(ga,gb,N)
+    return inv
+
+def simplify_interior(inv, h):
+    N = len(inv)
+    h1,h2 = _edge_to_int(h)
+    ord_int = _ordered_interior_edges(inv, h)
+    neg_hooks = []
+    pos_hooks = []
+    transv = []
+    for edge in ord_int:
+        if is_transversal(edge):
+            transv.append(edge)
+        elif is_lower_hook(edge):
+            e1,e2 = _edge_to_int(edge)
+            if e1 < h1:
+                neg_hooks.append(edge)
+            else:
+                pos_hooks.append(edge)
+
+    neg_hooks.sort(key = lambda edge: -_edge_to_int(edge)[0])
+    neg_hooks = [edge[::-1] for edge in neg_hooks]
+
+    transv.sort(key = lambda edge: _edge_to_int(edge)[0])
+    transv = [edge[::-1] for edge in transv]
+
+    pos_hooks.sort(key = lambda edge: N - _edge_to_int(edge)[1])
+
+
+    ord_int_new = neg_hooks + transv + pos_hooks
+    bottom_enum = [_edge_to_int(edge)[0] for edge in ord_int_new]
+
+    
+    factors = _find_swaps(bottom_enum, h1)
+    if len(factors) == 0:
+        return inv, []
+
+    factors = [f"T{int(f[1:])}" for f in factors]
+    simplifier = compose(factors[::-1], N)
+
+    res = compose_tangle(inv, simplifier)
+
+    return res, factors
+    
+    
+def _get_best_location(inv, h):
     h1,h2 = _edge_to_int(h)
     non_zero_int, zero_int = _interior_edges(inv, h)
 
@@ -513,11 +733,10 @@ def _factorizeH(inv,padding):
     for edge in non_zero_int:
         e1,e2 = _edge_to_int(edge)
         if is_lower_hook(edge) and e2 > h2:
-            locations[0] += val_lookup[e1 - h1]
+            locations[0] += size(edge) - val_lookup[e1 - h1]
         else:
-            locations[0] += val_lookup[e2 - h1]
+            locations[0] += size(edge) - val_lookup[e2 - h1]
 
-    locations[0] *= -1
     locations[0] += len(zero_int)
 
     best_location = (0, locations[0])
@@ -526,26 +745,56 @@ def _factorizeH(inv,padding):
         if locations[i] < best_location[1]:
             best_location = (i+1, locations[i])
     
-    j = best_location[0]
+    return best_location
+
+
+def _factorizeH(inv,padding):
+    best_lower_hook = {
+        "h" : None,
+        "location" : 0,
+        "value" : np.inf,
+        "s_factors" : [],
+        "new_inv" : None
+    }
+    
+    for h in _get_all_minimal_lower_hooks(inv):
+        new_inv, simplify_factors = simplify_interior(inv, h)
+        simplify_factors = [f"T{int(f[1:]) + padding}" for f in simplify_factors]
+        j, val = _get_best_location(new_inv, h)
+        if val < best_lower_hook["value"]:
+            best_lower_hook["h"] = h
+            best_lower_hook["location"] = j
+            best_lower_hook["value"] = val
+            best_lower_hook["s_factors"] = simplify_factors
+            best_lower_hook["new_inv"] = new_inv
+
+    h = best_lower_hook["h"]
+    j = best_lower_hook["location"]
+    simplify_factors = best_lower_hook["s_factors"]
+    new_inv = best_lower_hook["new_inv"]
+
+    # h = _get_smallest_lower_hook(new_inv)
+    h1,h2 = _edge_to_int(h)
     L = []
     for i in range(h1,h1+j-1):
         L.append(f"T{i}")
     
     R = []
-    for i in range(size(h)+h1-1,j+h1-1,-1):
+    for i in range(size(h)+h1-1,j+h1,-1):
         R.append(f"T{i}")
     
-    g = _inv_to_graph(inv)
+    g = _inv_to_graph(new_inv)
     LR = L + R
-    result = _compose(LR, len(inv), g)
+    result = _compose(LR, len(new_inv), g)
     L = []
     for i in range(h1,h1+j-1):
         L.append(f"T{i+padding}")
     
     R = []
-    for i in range(size(h)+h1-1,j+h1-1,-1):
+    for i in range(size(h)+h1-1,j+h1,-1):
         R.append(f"T{i+padding}")
-    return result, L[::-1] + R[::-1]
+    
+    return result, L[::-1] + R[::-1] + simplify_factors
 
 
 def _get_edges_that_cross_gap(inv, n):
@@ -763,9 +1012,9 @@ def _factorize_impl(inv, padding, is_optimal = True):
     
     # is H tangle by exclusion
     new_inv, ts = _factorizeH(inv, padding)
-    new_inv, u = _factorizeU(new_inv, padding)
+    # new_inv, u = _factorizeU(new_inv, padding)
     res = _factorize_impl(new_inv, padding, False)
-    res[0].extend(u + ts)
+    res[0].extend(ts)
     return res
 
 def text_to_inv(text):
@@ -835,7 +1084,7 @@ def init():
     maude.load('brauer.maude')
 
 
-def reduce(factor_list, max_patience = "auto"):
+def reduce(factor_list, max_patience = "auto", dfs = True):
     ''' Reduces the input term as an equivalent and (possibly) smaller factorization. \n
     Arguments:
         factor_list : the factor list to be reduced \n
@@ -853,7 +1102,9 @@ def reduce(factor_list, max_patience = "auto"):
 
     term = ",".join(term)
 
-    strategy_rule = "(delete ! | move)*"
+
+    strategy_rule = "(delete ! ; move)*"
+    # strategy_rule = "((delete | advanceddelete) ! ; (move | advancedmove))*"
 
     brauer = maude.getModule("REW-RULES")
     try:
@@ -878,7 +1129,7 @@ def reduce(factor_list, max_patience = "auto"):
     strategy = brauer.parseStrategy(strategy_rule)
     
     # perform srew with depth first search
-    results = t.srewrite(strategy, True)
+    results = t.srewrite(strategy, dfs)
     current_patience = max_patience
     for res in results:
         # calculate result length
@@ -908,7 +1159,7 @@ def reduce(factor_list, max_patience = "auto"):
 
     return factor_list
 
-def factorize_reduce(inv, max_patience = "auto"):
+def factorize_reduce(inv, max_patience = "auto", dfs = True):
     '''
     Returns the minimal factor list for the input tangle. \n
     Arguments:
@@ -920,44 +1171,21 @@ def factorize_reduce(inv, max_patience = "auto"):
     for factor_list, is_optimal in factor_lists:
         reduced_factor_list = factor_list
         if not is_optimal:
-            reduced_factor_list = reduce(factor_list, max_patience)
+            reduced_factor_list = reduce(factor_list, max_patience, dfs)
         final_factor_list.extend(reduced_factor_list)
     
     return final_factor_list
 
-def find_equivalent(factor_list):
-    ''' Returns all the equivalent factor lists, assuming factor_list is already minimal. \n
-    Arguments:
-        factor_list : the minimal factor list to be rewritten in equivalent forms \n
+def normal_form(inv):
     '''
+    Enumerates all the edges from left to right and from top to bottom.
+    '''
+    g = _inv_to_graph(inv)
+    return _get_inv(g, len(inv))[0]
 
-    factor_list = [factor for factor in factor_list if factor != "I"]
-
-    # covert factor list to Maude term
-    term = []
-    for factor in factor_list:
-        if factor == "I": continue
-
-        term.append(f"{factor[0]} {factor[1:]}")
-
-    term = ",".join(term)
-
-    brauer = maude.getModule("REW-RULES")
-    try:
-        t = brauer.parseTerm(term)
-    except:
-        raise Exception("An error has occurred. Have you called init() before this function?")
-        
-
-    strategy = brauer.parseStrategy("move *")
+def to_latex(factor_list):
+    latex = []
+    for f in factor_list:
+        latex.append(f"{f[0]}_{f[1:]}")
     
-    # perform srew with depth first search
-    results = t.srewrite(strategy, True)
-
-    for res in results:
-
-        equivalent_factor_list = []
-        for factor in str(res[0]).split(","):
-            equivalent_factor_list.append(factor.replace(" ", ""))
-        
-        yield equivalent_factor_list
+    return f' \circ '.join(latex)
